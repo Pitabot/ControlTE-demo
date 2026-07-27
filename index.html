@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ControlTE — PitaBot</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:    #0e1117;
+  --paper:  #f5f3ee;
+  --cream:  #edeae2;
+  --rule:   #d4cfc4;
+  --mid:    #8a8378;
+  --muted:  #b8b2a6;
+  --blue:   #1a3a6b;
+  --blue2:  #2c5faa;
+  --red:    #b52b27;
+  --gold:   #b07d2a;
+  --green:  #2a6e3f;
+  --purple: #5e3a8c;
+  --white:  #ffffff;
+  --wa:     #25d366;
+  --shadow: 0 2px 12px rgba(14,17,23,.10);
+  --shadow-lg: 0 8px 32px rgba(14,17,23,.18);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+
+/* ━━━ SPLASH / ONBOARDING ━━━ */
+#splash {
+  position: fixed; inset: 0; z-index: 999;
+  background: var(--blue);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 20px;
+  transition: opacity .4s;
+}
+#splash.hide { opacity: 0; pointer-events: none; }
+.splash-logo {
+  width: 90px; height: 90px;
+  background: rgba(255,255,255,.12);
+  border: 2px solid rgba(255,255,255,.3);
+  border-radius: 22px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 42px;
+}
+.splash-title { font-size: 32px; font-weight: 700; color: #fff; letter-spacing: -1px; }
+.splash-title span { color: #7dd3fc; }
+.splash-sub { font-size: 13px; color: rgba(255,255,255,.6); }
+.splash-btn {
+  margin-top: 10px;
+  background: #7dd3fc; color: var(--blue);
+  border: none; border-radius: 10px;
+  padding: 14px 40px; font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: transform .12s, box-shadow .12s;
+  font-family: 'DM Sans', sans-serif;
+}
+.splash-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.splash-free {
+  font-size: 11px; color: rgba(255,255,255,.45);
+  text-align: center; line-height: 1.6;
+}
+
+/* ━━━ PAYWALL OVERLAY ━━━ */
+#paywall {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(10,16,30,.85);
+  backdrop-filter: blur(6px);
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 20px;
+}
+#paywall.show { display: flex; }
+.paywall-card {
+  background: var(--white);
+  border-radius: 18px;
+  padding: 32px 28px;
+  max-width: 420px; width: 100%;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+.paywall-icon { font-size: 56px; margin-bottom: 14px; }
+.paywall-title { font-size: 24px; font-weight: 700; color: var(--blue); margin-bottom: 10px; }
+.paywall-sub { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 28px; }
+.wa-btn {
+  width: 100%; padding: 18px;
+  background: var(--wa); color: #fff;
+  border: none; border-radius: 12px;
+  font-size: 17px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+  font-family: 'DM Sans', sans-serif;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 20px rgba(37,211,102,.35);
+}
+.wa-btn:hover { background: #1fb855; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(37,211,102,.45); }
+.unlock-sep { font-size: 11px; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+.unlock-sep::before,.unlock-sep::after { content:''; flex:1; height:1px; background:var(--rule); }
+.unlock-row { display: flex; gap: 8px; }
+.unlock-inp {
+  flex: 1;
+  background: var(--paper); border: 1.5px solid var(--rule);
+  border-radius: 8px; padding: 10px 12px;
+  font-size: 13px; font-family: 'DM Mono', monospace;
+  outline: none; color: var(--ink);
+  text-transform: uppercase; letter-spacing: 2px;
+  transition: border-color .15s;
+}
+.unlock-inp:focus { border-color: var(--blue2); }
+.unlock-btn {
+  background: var(--blue); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 10px 16px; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: background .15s;
+  font-family: 'DM Sans', sans-serif; white-space: nowrap;
+}
+.unlock-btn:hover { background: var(--blue2); }
+.unlock-msg { font-size: 11px; margin-top: 8px; min-height: 16px; }
+.unlock-msg.ok { color: var(--green); }
+.unlock-msg.err { color: var(--red); }
+
+/* ━━━ HEADER ━━━ */
+.header {
+  background: var(--blue); color: var(--white);
+  padding: 0 20px; display: flex; align-items: center;
+  gap: 16px; height: 58px;
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: var(--shadow-lg);
+}
+.header-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,.2); padding-right: 16px; }
+.brand-logo { font-size: 22px; }
+.brand-name { font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
+.brand-name span { color: #7dd3fc; }
+.brand-sub { font-size: 9px; color: rgba(255,255,255,.5); margin-top: 1px; }
+.header-fields { display: flex; align-items: center; gap: 12px; flex: 1; flex-wrap: wrap; }
+.hfield { display: flex; align-items: center; gap: 6px; }
+.hfield-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,.5); }
+.hfield input, .hfield select {
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  color: #fff; border-radius: 5px; padding: 5px 8px;
+  font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none;
+}
+.hfield input { width: 95px; }
+.hfield select { width: 200px; cursor: pointer; }
+.hfield select option { background: var(--blue); }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.chip { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-radius: 20px; padding: 3px 10px; font-size: 10px; color: rgba(255,255,255,.75); white-space: nowrap; }
+.chip b { color: #7dd3fc; }
+.status-badge {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+  border-radius: 20px; padding: 4px 10px;
+  font-size: 10px; font-weight: 600; color: rgba(255,255,255,.8);
+  cursor: pointer;
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; }
+.status-dot.free { background: var(--gold); }
+.status-dot.active { background: var(--wa); }
+
+/* ━━━ TABS ━━━ */
+.tabs-bar { background: var(--white); border-bottom: 2px solid var(--rule); display: flex; padding: 0 20px; }
+.tab-btn { padding: 11px 16px; font-size: 12px; font-weight: 600; color: var(--mid); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .15s; }
+.tab-btn:hover { color: var(--ink); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue2); }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ━━━ LAYOUT ━━━ */
+.container { max-width: 1160px; margin: 0 auto; padding: 20px; }
+.sec-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.8px; color: var(--mid); margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+.sec-lbl::after { content:''; flex:1; height:1px; background:var(--rule); }
+
+/* ━━━ WEEK NAV ━━━ */
+.week-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.nav-btn { background: var(--white); border: 1.5px solid var(--rule); color: var(--ink); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 600; transition: all .15s; box-shadow: var(--shadow); }
+.nav-btn:hover { border-color: var(--blue2); color: var(--blue); }
+.week-info .week-num { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--blue); }
+.week-info .week-rng { font-size: 11px; color: var(--mid); }
+#btn-pag { margin-left: auto; border-color: var(--green); color: var(--green); }
+#btn-pag:hover { background: var(--green); color: #fff; }
+#btn-pag.paid { background: rgba(42,110,63,.1); opacity: .7; }
+
+/* ━━━ FREE COUNTER ━━━ */
+.free-bar {
+  background: #fff8e6; border: 1.5px solid #e8d48a;
+  border-left: 3px solid var(--gold);
+  border-radius: 8px; padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; gap: 12px; flex-wrap: wrap;
+}
+.free-bar-txt { font-size: 12px; color: #5a4800; line-height: 1.5; }
+.free-bar-txt b { color: var(--gold); }
+.free-weeks { display: flex; gap: 6px; }
+.fweek { width: 36px; height: 8px; border-radius: 4px; }
+.fweek.used { background: var(--gold); }
+.fweek.used.last { background: var(--red); }
+.fweek.free { background: var(--rule); }
+
+/* ━━━ NOTICE ━━━ */
+.notice { background: #fff8e6; border: 1px solid #e8d48a; border-left: 3px solid var(--gold); border-radius: 7px; padding: 10px 14px; font-size: 12px; color: #5a4800; margin-bottom: 16px; line-height: 1.7; }
+
+/* ━━━ DAYS ━━━ */
+.days-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; margin-bottom: 20px; }
+.day-card { background: var(--white); border: 1.5px solid var(--rule); border-radius: 10px; padding: 12px 8px; text-align: center; box-shadow: var(--shadow); transition: border-color .15s, transform .12s; }
+.day-card:hover { transform: translateY(-1px); }
+.day-card.festivo { border-color: var(--gold); background: #fffbf0; }
+.day-card.descanso { border-color: var(--purple); background: #faf6ff; }
+.day-name { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--mid); margin-bottom: 3px; }
+.day-date { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 5px; }
+.day-tag { display: inline-block; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; padding: 2px 6px; border-radius: 8px; margin-bottom: 7px; min-height: 14px; }
+.day-tag.festivo { background: #fff3d0; color: var(--gold); }
+.day-tag.descanso { background: #f0e8ff; color: var(--purple); }
+.day-tag.normal { background: transparent; color: transparent; }
+.hrs-inp { width: 100%; background: var(--paper); border: 1.5px solid var(--rule); border-radius: 6px; color: var(--ink); text-align: center; font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; padding: 7px 4px; outline: none; transition: border-color .15s; -moz-appearance: textfield; }
+.hrs-inp::-webkit-inner-spin-button, .hrs-inp::-webkit-outer-spin-button { -webkit-appearance: none; }
+.hrs-inp::placeholder { color: var(--muted); opacity: 1; }
+.hrs-inp::-webkit-input-placeholder { color: var(--muted); }
+.hrs-inp:focus { border-color: var(--blue2); background: var(--white); }
+.day-card.festivo .hrs-inp:focus { border-color: var(--gold); }
+.day-card.descanso .hrs-inp:focus { border-color: var(--purple); }
+.hrs-lbl { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.type-row { display: flex; gap: 3px; margin-top: 8px; }
+.type-btn { flex: 1; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 1px; border-radius: 4px; border: 1px solid var(--rule); background: transparent; color: var(--muted); cursor: pointer; transition: all .12s; font-family: 'DM Sans', sans-serif; }
+.type-btn.on-n { background: #e8f0ff; border-color: var(--blue2); color: var(--blue); }
+.type-btn.on-f { background: #fff3d0; border-color: var(--gold); color: var(--gold); }
+.type-btn.on-d { background: #f0e8ff; border-color: var(--purple); color: var(--purple); }
+
+/* ━━━ SUMMARY ━━━ */
+.scards { display: grid; grid-template-columns: repeat(6,1fr); gap: 10px; margin-bottom: 20px; }
+.scard { background: var(--white); border: 1.5px solid var(--rule); border-radius: 10px; padding: 13px; box-shadow: var(--shadow); }
+.scard-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--mid); margin-bottom: 5px; }
+.scard-val { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; color: var(--ink); }
+.scard-unit { font-size: 10px; color: var(--muted); margin-left: 3px; }
+.scard.hl { background: var(--blue); border-color: var(--blue); }
+.scard.hl .scard-lbl { color: rgba(255,255,255,.6); }
+.scard.hl .scard-val { color: #fff; }
+
+/* ━━━ TABLE ━━━ */
+.tbl-wrap { background: var(--white); border: 1.5px solid var(--rule); border-radius: 10px; overflow: auto; box-shadow: var(--shadow); margin-bottom: 20px; }
+table { width: 100%; border-collapse: collapse; min-width: 780px; }
+thead tr { background: var(--blue); }
+th { padding: 9px 12px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,.7); text-align: right; white-space: nowrap; }
+th:first-child { text-align: left; }
+td { padding: 9px 12px; border-top: 1px solid var(--cream); font-family: 'DM Mono', monospace; font-size: 12px; text-align: right; color: var(--mid); }
+td:first-child { font-family: 'DM Sans', sans-serif; text-align: left; color: var(--ink); font-size: 13px; }
+tr.zrow td { opacity: .28; }
+tr.trow td { background: var(--cream); color: var(--ink); font-weight: 500; border-top: 2px solid var(--rule); }
+tr.grow td { background: var(--blue); color: rgba(255,255,255,.85); font-size: 13px; font-weight: 500; border-top: 2px solid var(--blue); }
+tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
+.tag-f { color: var(--gold); font-size: 10px; margin-left: 4px; }
+.tag-d { color: var(--purple); font-size: 10px; margin-left: 4px; }
+.z { color: var(--muted); }
+.tol-hhmm { font-weight: 500; color: var(--ink); }
+.tol-min { display: block; font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+/* ━━━ HISTORIAL ━━━ */
+.hitem { background: var(--white); border: 1.5px solid var(--rule); border-radius: 9px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all .15s; margin-bottom: 8px; box-shadow: var(--shadow); }
+.hitem:hover { border-color: var(--blue2); box-shadow: var(--shadow-lg); }
+.hitem.paid { border-left: 3px solid var(--green); }
+.hwk { font-weight: 700; font-size: 13px; }
+.hdet { font-size: 11px; color: var(--mid); margin-top: 2px; }
+.htot { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: var(--blue); }
+.hbdg { font-size: 10px; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.hbdg.pg { background: #e6f5ec; color: var(--green); border: 1px solid #b4dfc3; }
+.hbdg.pe { background: #fff8e6; color: var(--gold); border: 1px solid #e8d48a; }
+
+/* ━━━ REFERENCIA ━━━ */
+.ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.rbox { background: var(--white); border: 1.5px solid var(--rule); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+.rbox-hd { background: var(--cream); padding: 9px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--mid); border-bottom: 1px solid var(--rule); }
+.rrow { display: flex; justify-content: space-between; padding: 7px 14px; border-bottom: 1px solid var(--cream); font-size: 12px; }
+.rrow:last-child { border-bottom: none; }
+.rrow span:first-child { color: var(--mid); }
+.rrow span:last-child { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--green); }
+.rrow.na span:last-child { color: var(--muted); }
+
+/* ━━━ SOPORTE ━━━ */
+.soporte-card { background: var(--white); border: 1.5px solid var(--rule); border-radius: 14px; padding: 28px; max-width: 480px; margin: 0 auto; box-shadow: var(--shadow-lg); text-align: center; }
+.soporte-icon { font-size: 48px; margin-bottom: 12px; }
+.soporte-title { font-size: 20px; font-weight: 700; color: var(--blue); margin-bottom: 8px; }
+.soporte-sub { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 24px; }
+.soporte-wa { display: inline-flex; align-items: center; gap: 10px; background: var(--wa); color: #fff; text-decoration: none; padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 700; transition: all .15s; }
+.soporte-wa:hover { background: #1fb855; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37,211,102,.3); }
+.soporte-hours { font-size: 11px; color: var(--muted); margin-top: 14px; }
+
+/* ━━━ FOOTER ━━━ */
+.footer { text-align: center; padding: 20px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--rule); margin-top: 20px; }
+.footer b { color: var(--mid); }
+
+/* ━━━ BOTÓN FLOTANTE SOPORTE ━━━ */
+.wa-float {
+  position: fixed; bottom: 24px; right: 24px; z-index: 300;
+  background: var(--wa); color: #fff;
+  border: none; border-radius: 50px;
+  padding: 14px 20px;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  font-family: 'DM Sans', sans-serif;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 6px 24px rgba(37,211,102,.45);
+  text-decoration: none;
+}
+.wa-float:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 10px 32px rgba(37,211,102,.55); }
+  .days-grid { grid-template-columns: repeat(4,1fr); }
+  .scards { grid-template-columns: repeat(3,1fr); }
+  .ref-grid { grid-template-columns: 1fr; }
+  .plans-grid { grid-template-columns: 1fr; }
+  .header-fields { display: none; }
+}
+/* ══════ COTEJADOR DE RECIBO ══════ */
+.instruccion {
+  background: #e8f0ff; border: 1.5px solid #c5d8f5;
+  border-left: 3px solid var(--blue2, var(--blue));
+  border-radius: 8px; padding: 12px 16px;
+  font-size: 12px; color: var(--blue); line-height: 1.7;
+  margin-bottom: 22px;
+}
+.input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.input-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 600px) {
+  .input-grid, .input-grid.three { grid-template-columns: 1fr; }
+}
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--mid); }
+.field input, .field select {
+  background: var(--paper); border: 1.5px solid var(--rule);
+  border-radius: 7px; padding: 9px 12px;
+  font-size: 13px; font-family: 'DM Mono', monospace;
+  color: var(--ink); outline: none;
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus { border-color: var(--blue2, var(--blue)); background: #fff; }
+.field select { font-family: 'DM Sans', sans-serif; cursor: pointer; }
+.field .hint { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.btn-calc {
+  width: 100%; padding: 14px;
+  background: var(--blue); color: #fff;
+  border: none; border-radius: 9px;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.btn-calc:hover { background: var(--blue2, var(--blue)); transform: translateY(-1px); }
+#resultado { display: none; }
+.result-header { background: var(--blue); color: #fff; border-radius: 10px 10px 0 0; padding: 14px 18px; font-size: 12px; font-weight: 700; }
+.result-body { background: #fff; border: 1.5px solid var(--rule); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
+.decode-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+@media (max-width: 600px) { .decode-grid { grid-template-columns: repeat(2, 1fr); } }
+.dcard { padding: 16px 14px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); text-align: center; }
+.dcard:nth-child(4n) { border-right: none; }
+@media (max-width: 600px) { .dcard:nth-child(2n) { border-right: none; } }
+.dcard-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--mid); margin-bottom: 6px; }
+.dcard-val { font-family: 'DM Mono', monospace; font-size: 19px; font-weight: 500; color: var(--ink); }
+.dcard-unit { font-size: 10px; color: var(--muted); margin-left: 2px; }
+.dcard.hl .dcard-val { color: var(--blue); font-size: 16px; }
+.dcard.gold .dcard-val { color: #b07d2a; }
+.dcard.green .dcard-val { color: #2a6e3f; }
+.cotejo-card { border-radius: 10px; overflow: hidden; border: 1.5px solid var(--rule); margin-bottom: 14px; }
+.cotejo-header { padding: 11px 16px; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
+.cotejo-header.match { background: #e6f5ec; color: #2a6e3f; border-bottom: 1px solid #b4dfc3; }
+.cotejo-header.no-match { background: #fff8e6; color: #b07d2a; border-bottom: 1px solid #e8d48a; }
+.cotejo-header.error { background: #fdecea; color: #b52b27; border-bottom: 1px solid #f5c6c3; }
+.cotejo-body { background: #fff; }
+.cotejo-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--rule); font-size: 12px; }
+.cotejo-row:last-child { border-bottom: none; }
+.cotejo-row span:first-child { color: var(--mid); }
+.cotejo-row .vals { display: flex; gap: 16px; align-items: center; }
+.val-recibo { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--blue); }
+.val-historial { font-family: 'DM Mono', monospace; font-weight: 500; color: #2a6e3f; }
+.val-diff { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
+.val-diff.ok { background: #e6f5ec; color: #2a6e3f; }
+.val-diff.warn { background: #fff8e6; color: #b07d2a; }
+.val-diff.err { background: #fdecea; color: #b52b27; }
+.badge-match { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
+.badge-match.ok { background: rgba(42,110,63,.15); color: #2a6e3f; }
+.badge-match.warn { background: rgba(176,125,42,.15); color: #b07d2a; }
+.badge-match.err { background: rgba(181,43,39,.12); color: #b52b27; }
+.no-historial { padding: 20px; text-align: center; font-size: 12px; color: var(--mid); }
+.tol-note { background: var(--rule); border-radius: 7px; padding: 10px 14px; font-size: 11px; color: var(--mid); line-height: 1.6; margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ SPLASH ═══ -->
+<div id="splash">
+  <div class="splash-logo">💰</div>
+  <div class="splash-title">Control<span>TE</span></div>
+  <div class="splash-sub">by PitaBot · PEMEX · STPRM · CCT 2025–2027</div>
+  <button class="splash-btn" onclick="initApp()">Comenzar →</button>
+  <div class="splash-free">✅ 2 semanas gratis incluidas<br>Sin tarjeta de crédito requerida</div>
+</div>
+
+<!-- ═══ PAYWALL ═══ -->
+<div id="paywall">
+  <div class="paywall-card">
+    <div class="paywall-icon">🔒</div>
+    <div class="paywall-title">Se requiere código de acceso</div>
+    <div class="paywall-sub">
+      ControlTE funciona con un código de acceso — de pago o de prueba (15 días).<br>
+      Contáctame por WhatsApp para conseguir el tuyo.
+    </div>
+
+    <button class="wa-btn" onclick="contactarWA()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.335-1.524A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.667-.504-5.198-1.385l-.373-.221-3.861.929.972-3.762-.243-.387A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+      💬 Contactar soporte técnico — WhatsApp
+    </button>
+
+    <div class="unlock-sep">¿Ya tienes tu código de acceso?</div>
+    <div class="unlock-row">
+      <input class="unlock-inp" id="unlock-inp" placeholder="Ingresa tu código" maxlength="12">
+    </div>
+    <div class="unlock-row" style="margin-top:6px">
+      <input class="unlock-inp" id="unlock-tel" type="tel" placeholder="Tu número de teléfono" maxlength="15">
+      <button class="unlock-btn" onclick="validarCodigo()">Activar</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:4px">
+      Primera vez: escribe tu número completo. Si cambias de teléfono, solo pide los últimos 4 dígitos.
+    </div>
+    <div class="unlock-msg" id="unlock-msg"></div>
+  </div>
+</div>
+
+<!-- ═══ HEADER ═══ -->
+<header class="header">
+  <div class="header-brand">
+    <div class="brand-logo">💰</div>
+    <div>
+      <div class="brand-name">Control<span>TE</span></div>
+      <div class="brand-sub">PitaBot · CCT 2025–2027</div>
+    </div>
+  </div>
+  <div class="header-fields">
+    <div class="hfield">
+      <span class="hfield-lbl">Trabajador</span>
+      <input id="inp-nombre" value=" " oninput="guardar()">
+    </div>
+    <div class="hfield">
+      <span class="hfield-lbl">Nivel</span>
+      <select id="sel-nivel" onchange="cambiarNivel()"></select>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="chip">Salario: <b id="chip-sal">—</b></div>
+    <div class="chip">Hora TE: <b id="chip-hora">—</b></div>
+    <span id="sync-status" style="font-size:10px;color:var(--muted,#888);margin-right:6px;"></span>
+    <div class="status-badge" onclick="verEstado()" id="status-badge">
+      <div class="status-dot free" id="status-dot"></div>
+      <span id="status-txt">Gratis</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ TABS ═══ -->
+<div class="tabs-bar">
+  <div class="tab-btn active" onclick="showTab('captura')">📋 Captura</div>
+  <div class="tab-btn" onclick="showTab('historial')">📊 Historial</div>
+  <div class="tab-btn" onclick="showTab('cotejador')">🔍 Cotejador</div>
+  <div class="tab-btn" onclick="showTab('referencia')">📖 Referencia</div>
+  <div class="tab-btn" onclick="showTab('soporte')">💬 Soporte</div>
+</div>
+
+<div class="container">
+
+  <!-- ═══ CAPTURA ═══ -->
+  <div id="tab-captura" class="tab-pane active">
+
+    <!-- Barra semanas gratuitas -->
+    <div class="free-bar" id="free-bar">
+      <div class="free-bar-txt">
+        <b id="free-txt">Semanas usadas: 0 / 2</b><br>
+        <span id="free-sub">Tienes 2 semanas gratuitas disponibles</span>
+      </div>
+      <div class="free-weeks">
+        <div class="fweek free" id="fw1"></div>
+        <div class="fweek free" id="fw2"></div>
+      </div>
+    </div>
+
+    <div class="notice">
+      ⚠️ <strong>Festivo (CCT Cl. 139):</strong> Sin tolerancia antes de 12h · Comidas desde 12h &nbsp;|&nbsp;
+      <strong>Descanso semanal:</strong> Tolerancia desde 4h · Comidas desde 12h
+    </div>
+
+    <!-- SELECTOR NIVEL, NOMBRE Y JORNADA — siempre visible -->
+    <div style="display:flex;gap:12px;align-items:center;background:var(--white);border:1.5px solid var(--rule);border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow);flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:140px;">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mid);">Trabajador</span>
+        <input id="inp-nombre2" style="flex:1;background:var(--paper);border:1.5px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:var(--ink);" value="" placeholder="Nombre del trabajador" oninput="document.getElementById('inp-nombre').value=this.value;guardar()">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex:2;min-width:200px;">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mid);white-space:nowrap;">Nivel</span>
+        <select id="sel-nivel2" onchange="document.getElementById('sel-nivel').value=this.value;cambiarNivel();"
+          style="flex:1;background:var(--paper);border:1.5px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:var(--ink);cursor:pointer;">
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;min-width:160px;">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mid);white-space:nowrap;">Jornada</span>
+        <select id="sel-jornada" onchange="cambiarJornada();"
+          style="flex:1;background:var(--paper);border:1.5px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:var(--ink);cursor:pointer;">
+          <option value="00">Jornada 00 — L-V</option>
+          <option value="07">Jornada 07 — 6 días</option>
+        </select>
+      </div>
+      <div style="background:var(--blue);border-radius:8px;padding:8px 14px;text-align:center;min-width:120px;">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.6);">Salario diario</div>
+        <div id="sal-visible" style="font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:#7dd3fc;margin-top:2px;">$276.08</div>
+      </div>
+    </div>
+
+    <div class="week-nav">
+      <button class="nav-btn" onclick="cambiarSemana(-1)">← Anterior</button>
+      <div class="week-info">
+        <div class="week-num" id="wnum">Semana 19</div>
+        <div class="week-rng" id="wrng"></div>
+      </div>
+      <button class="nav-btn" onclick="cambiarSemana(1)">Siguiente →</button>
+      <button class="nav-btn" id="btn-pag" onclick="marcarPagado()">✓ Marcar pagado</button>
+    </div>
+
+    <div class="sec-lbl">Días de la semana</div>
+    <div class="days-grid" id="days-grid"></div>
+    <div class="scards" id="scards"></div>
+
+    <div class="sec-lbl">Desglose por concepto de nómina</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Día</th><th>Horas</th><th>Tolerancia</th>
+          <th>1130 T.E. medido</th><th>1140 # Comidas</th><th>Importe comidas</th>
+          <th>1180 TE tolerancia</th>
+          <th style="color:#f5c842">1190 T.penado CCT</th>
+          <th>Subtotal</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ HISTORIAL ═══ -->
+  <div id="tab-historial" class="tab-pane">
+    <div class="sec-lbl">Semanas registradas</div>
+    <div id="hlist"></div>
+  </div>
+
+  <!-- ═══ COTEJADOR ═══ -->
+  <div id="tab-cotejador" class="tab-pane">
+    <div class="instruccion">
+      <strong>¿Cómo funciona?</strong> Ingresa los montos y la fecha que aparecen en tu recibo de pago.
+      La calculadora decodifica cuántas horas, comidas y tiempo penado representan esos montos,
+      y los coteja con las semanas registradas en tu historial de ControlTE para verificar si coinciden.
+    </div>
+
+    <div class="sec-lbl">Datos del recibo</div>
+    <div class="card">
+      <div class="input-grid">
+        <div class="field">
+          <label>Nivel</label>
+          <select id="inp-nivel"></select>
+        </div>
+        <div class="field">
+          <label>Fecha del recibo / catorcena</label>
+          <input type="date" id="inp-fecha">
+          <span class="hint">Fecha de pago o inicio de catorcena</span>
+        </div>
+      </div>
+
+      <div class="input-grid three">
+        <div class="field">
+          <label>Concepto 1130 — T.E. medido ($)</label>
+          <input type="number" id="inp-1130" placeholder="0.00" min="0" step="0.01">
+          <span class="hint">Tiempo extraordinario ocasional</span>
+        </div>
+        <div class="field">
+          <label>Concepto 1140 — Comidas ($)</label>
+          <input type="number" id="inp-1140" placeholder="0.00" min="0" step="0.01">
+          <span class="hint">$187.75 por comida</span>
+        </div>
+        <div class="field">
+          <label>Concepto 1190 — T. penado ($)</label>
+          <input type="number" id="inp-1190" placeholder="0.00" min="0" step="0.01">
+          <span class="hint">Tiempo penado (recibo o CCT)</span>
+        </div>
+      </div>
+      <div class="input-grid">
+        <div class="field">
+          <label>Concepto 1180 — TE Tolerancia ($)</label>
+          <input type="number" id="inp-1180" placeholder="0.00" min="0" step="0.01">
+          <span class="hint">Tiempo extra por tolerancia</span>
+        </div>
+        <div class="field">
+          <label>Jornada</label>
+          <select id="inp-jornada">
+            <option value="00">Jornada 00 — Lunes a Viernes</option>
+            <option value="07">Jornada 07 — 6 días</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-calc" onclick="cotejarRecibo()">🔍 Decodificar y cotejar</button>
+    </div>
+
+    <div id="resultado">
+      <div class="sec-lbl">Decodificación del recibo</div>
+      <div style="margin-bottom:20px;">
+        <div class="result-header" id="res-header">Resultado</div>
+        <div class="result-body">
+          <div class="decode-grid" id="decode-grid"></div>
+        </div>
+      </div>
+
+      <div class="tol-note" id="tol-note" style="display:none"></div>
+
+      <div class="sec-lbl" style="margin-top:20px;">Cotejo con historial</div>
+      <div id="cotejo-area"></div>
+    </div>
+  </div>
+
+  <!-- ═══ REFERENCIA ═══ -->
+  <div id="tab-referencia" class="tab-pane">
+    <div class="ref-grid">
+      <div class="rbox"><div class="rbox-hd">Tolerancia por horas (tabla instructivo)</div><div id="ref-tol"></div></div>
+      <div class="rbox"><div class="rbox-hd">Comidas — normal (≥4h) · festivo/descanso (≥12h)</div><div id="ref-com"></div></div>
+    </div>
+    <div class="ref-grid">
+      <div class="rbox"><div class="rbox-hd">Tasas — nivel seleccionado</div><div id="ref-tasas"></div></div>
+      <div class="rbox">
+        <div class="rbox-hd">Días festivos PEMEX 2026 (CCT Cl. 139 + LFT)</div>
+        <div>
+          <div class="rrow"><span>1 enero — descanso obligatorio LFT</span><span>✓</span></div>
+          <div class="rrow"><span>2 febrero — descanso obligatorio LFT</span><span>✓</span></div>
+          <div class="rrow"><span>16 marzo — festivo CCT</span><span>✓</span></div>
+          <div class="rrow"><span>2 abril — Jueves Santo CCT</span><span>✓</span></div>
+          <div class="rrow"><span>3 abril — Viernes Santo CCT</span><span>✓</span></div>
+          <div class="rrow"><span>4 abril — Sábado de Gloria CCT</span><span>✓</span></div>
+          <div class="rrow"><span>1 mayo — descanso obligatorio LFT</span><span>✓</span></div>
+          <div class="rrow"><span>5 mayo — festivo CCT</span><span>✓</span></div>
+          <div class="rrow"><span>16 septiembre — descanso obligatorio LFT</span><span>✓</span></div>
+          <div class="rrow"><span>12 octubre — festivo CCT</span><span>✓</span></div>
+          <div class="rrow"><span>1 noviembre — festivo CCT</span><span>✓</span></div>
+          <div class="rrow"><span>2 noviembre — festivo CCT</span><span>✓</span></div>
+          <div class="rrow"><span>16 noviembre — descanso obligatorio LFT</span><span>✓</span></div>
+          <div class="rrow"><span>25 diciembre — descanso obligatorio LFT</span><span>✓</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SOPORTE ═══ -->
+  <div id="tab-soporte" class="tab-pane">
+    <div class="soporte-card">
+      <div class="soporte-icon">💰</div>
+      <div class="soporte-title">Soporte técnico PitaBot</div>
+      <div class="soporte-sub">
+        ¿Tienes dudas sobre la app o quieres activar tu acceso completo?<br>
+        Escríbeme directamente por WhatsApp y te atiendo a la brevedad.
+      </div>
+      <a class="soporte-wa" href="https://wa.me/529616868835" target="_blank">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.335-1.524A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.667-.504-5.198-1.385l-.373-.221-3.861.929.972-3.762-.243-.387A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+        Escribir a WhatsApp
+      </a>
+      <div class="soporte-hours">ControlTE by PitaBot · PEMEX STPRM CCT 2025–2027</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <b>ControlTE</b> by PitaBot &nbsp;·&nbsp; PEMEX · STPRM · CCT 2025–2027 &nbsp;·&nbsp; Todos los derechos reservados
+  <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">
+    ID de respaldo: <span id="uid-display">—</span>
+    <button onclick="copiarUid()" style="margin-left:6px;font-size:9px;padding:2px 6px;border:1px solid var(--rule);border-radius:4px;background:none;cursor:pointer;color:var(--muted)">Copiar</button>
+    <span id="uid-copiado" style="margin-left:4px;color:var(--blue,#1A3A6B)"></span>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+// Muestra el ID de respaldo (getUserKey) en pantalla, sin necesitar consola.
+// Útil para confirmar bajo qué identidad se está guardando este dispositivo,
+// o para comparar con el ID de otro dispositivo al hacer pruebas de sync.
+function mostrarUidEnPantalla() {
+  const el = document.getElementById('uid-display');
+  if (el) el.textContent = getUserKey();
+}
+function copiarUid() {
+  const uid = getUserKey();
+  navigator.clipboard.writeText(uid).then(() => {
+    const msg = document.getElementById('uid-copiado');
+    msg.textContent = '✓ copiado';
+    setTimeout(() => msg.textContent = '', 2000);
+  });
+}
+</script>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TABULADOR NIVEL 8–35  (Anexo 1, ago 2025)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const TAB = {
+   8:180.01,  9:181.00, 10:181.85, 11:182.74, 12:186.50,
+  13:195.79, 14:205.49, 15:215.78, 16:221.68, 17:232.26,
+  18:244.02, 19:255.21, 20:265.34, 21:276.08, 22:285.72,
+  23:295.64, 24:305.31, 25:310.40, 26:326.12, 27:340.30,
+  28:353.52, 29:367.60, 30:382.90, 31:398.51, 32:414.07,
+  33:430.77, 34:448.11, 35:467.73
+};
+// Ayuda Renta de Casa por nivel (Anexo 1, ago 2025)
+const ARC = {
+   8:63.76,   9:71.26,  10:73.24,  11:74.73,  12:77.27,
+  13:90.79,  14:101.75, 15:112.61, 16:116.52, 17:116.56,
+  18:116.57, 19:116.58, 20:116.59, 21:116.60, 22:116.64,
+  23:116.65, 24:116.66, 25:122.91, 26:129.95, 27:140.86,
+  28:151.03, 29:159.68, 30:166.34, 31:166.36, 32:166.37,
+  33:166.38, 34:166.39, 35:171.83
+};
+const TASA_COMIDA = 187.75;
+const TOL_PCT     = 0.123;
+const TTOL = {2:0,4:20,5:40,6:60,7:80,8:100,9:120,10:140,
+              11:160,12:180,13:200,14:220,15:240,16:260};
+const FEST = new Set([
+  '2026-01-01','2026-02-02','2026-03-16',
+  '2026-04-02','2026-04-03','2026-04-04',
+  '2026-05-01','2026-05-05','2026-09-16',
+  '2026-10-12','2026-11-01','2026-11-02',
+  '2026-11-16','2026-12-25'
+]);
+const DNOM = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const WA_NUM = '529616868835';
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FREEMIUM — límite 2 semanas
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Licencia: { code, plan:'week'|'month'|'year', activado: timestamp, expira: timestamp }
+function getLicencia() {
+  try { return JSON.parse(localStorage.getItem('cte_lic') || 'null'); } catch { return null; }
+}
+function setLicencia(lic) { localStorage.setItem('cte_lic', JSON.stringify(lic)); }
+
+function licenciaActiva() {
+  const lic = getLicencia();
+  if (!lic) return false;
+  return Date.now() < lic.expira;
+}
+
+// Verifica en Firestore si expira (la fecha real, controlada solo por el
+// admin) ya pasó. Nota: aunque esta funcion fallara o nunca corriera, las
+// reglas de "semanas" YA rechazan lectura/escritura cuando expira venció
+// — esto es solo para avisarle al usuario con un mensaje claro, en vez de
+// dejarlo adivinando por qué de repente nada guarda.
+async function verificarRevocacion() {
+  if (!fbCodigo) return;
+  try {
+    const snap = await db.collection('cuentas').doc(fbCodigo).get();
+    if (!snap.exists) return;
+    const cuenta = snap.data();
+    if (cuenta.expira && cuenta.expira <= Date.now()) {
+      localStorage.removeItem('cte_lic');
+      alert('Tu acceso a ControlTE venció. Contacta a soporte para renovar.');
+      location.reload();
+    }
+  } catch (e) {
+    // Sin internet u otro fallo: no bloquea al usuario, se reintenta despues.
+  }
+}
+
+function diasRestantes() {
+  const lic = getLicencia();
+  if (!lic) return 0;
+  return Math.max(0, Math.ceil((lic.expira - Date.now()) / 86400000));
+}
+
+// Semanas con datos reales (con al menos 1 hora ingresada)
+function semanasUsadas() {
+  const d = JSON.parse(localStorage.getItem('cte_v4') || '{}');
+  return Object.values(d).filter(sd =>
+    sd.dias && sd.dias.some(dia => (dia.horas||0) > 0)
+  ).length;
+}
+
+function puedeUsarSemana(s) {
+  // Ya NO hay modo gratis sin codigo. Toda captura requiere una cuenta
+  // activa (sea plan pago o un codigo de prueba de 15 dias que tu creas
+  // manualmente en Firestore, plan:"trial"). Sin codigo canjeado, no se
+  // puede capturar ni una sola hora.
+  return licenciaActiva();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ESTADO
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const SEM_BASE  = 19;
+const DATE_BASE = new Date(2026, 4, 4); // lunes 4 mayo 2026 = semana 19
+
+let nivel   = parseInt(localStorage.getItem('cte_nivel')   || 21);
+let semana  = parseInt(localStorage.getItem('cte_semana')  || SEM_BASE);
+let datos   = JSON.parse(localStorage.getItem('cte_v4')    || '{}');
+let jornada = localStorage.getItem('cte_jornada') || '00';
+
+// Hora extra ocasional (1130) = (sal + 60%sal + arc) ÷ 8 × 2  (Cláusula 193)
+const horaTE       = () => ((TAB[nivel] + TAB[nivel] * 0.60 + ARC[nivel]) / 8) * 2;
+// Hora penada CCT (1190) = (sal ÷ 8) + hora_ocasional  (Cláusula 193)
+const penHoraCCT    = () => (TAB[nivel] / 8) + horaTE();
+// Hora penada recibo = sal ÷ 8 (lo que PEMEX aplica en la práctica)
+const penHoraRecibo = () => TAB[nivel] / 8;
+
+function semInicio(s) {
+  const d = new Date(DATE_BASE);
+  d.setDate(d.getDate() + (s - SEM_BASE) * 7);
+  return d;
+}
+
+function semData(s) {
+  const k = 's' + s;
+  if (!datos[k]) {
+    const ini = semInicio(s);
+    datos[k] = {
+      pagado: false,
+      // SNAPSHOT: nivel, salario tabulado y ARC vigentes AL MOMENTO de capturar
+      // esta semana. Esto evita que un incremento salarial futuro recalcule
+      // (y por tanto altere) el monto que correspondía a semanas ya pasadas.
+      nivelSnap: nivel,
+      salSnap:   TAB[nivel],
+      arcSnap:   ARC[nivel],
+      dias: Array.from({length:7}, (_,i) => {
+        const d = new Date(ini); d.setDate(d.getDate()+i);
+        const iso = d.toISOString().slice(0,10);
+        return { fecha:iso, horas:0, tipo: FEST.has(iso)?'festivo': i>=5?'descanso':'normal' };
+      })
+    };
+  } else if (datos[k].salSnap === undefined) {
+    // Migración de semanas capturadas ANTES de este arreglo: no tenemos el
+    // salario real de ese momento, así que usamos el actual como mejor
+    // aproximación disponible y lo dejamos fijo desde ahora en adelante.
+    datos[k].nivelSnap = datos[k].nivelSnap ?? nivel;
+    datos[k].salSnap   = TAB[datos[k].nivelSnap];
+    datos[k].arcSnap   = ARC[datos[k].nivelSnap];
+  }
+  return datos[k];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FIREBASE — reemplaza JSONBin por completo.
+// firebaseConfig NO es secreto (identifica el proyecto, no da permisos).
+// La seguridad real vive en firestore.rules, ya desplegado en controlte-prod.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const firebaseConfig = {
+  apiKey: "AIzaSyCVvu-yF6a67nKPyVGxjQMSVbM7ipBfj4E",
+  authDomain: "controlte-demo.firebaseapp.com",
+  projectId: "controlte-demo",
+  storageBucket: "controlte-demo.firebasestorage.app",
+  messagingSenderId: "540368855928",
+  appId: "1:540368855928:web:f4b12078397b3a09fb1e8d"
+};
+
+const fbApp = firebase.initializeApp(firebaseConfig);
+const auth  = firebase.auth();
+const db    = firebase.firestore();
+
+let fbUid    = null;   // se llena al autenticar, ver initAuthFirebase()
+let fbCodigo = null;   // codigo de licencia activo, una vez canjeado
+
+// Hash simple para no guardar el telefono en texto plano (no es criptografico,
+// solo evita que se lea a simple vista en la consola de Firebase).
+function hashSimple(texto) {
+  let h = 0;
+  for (const c of texto) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
+  return h.toString(16);
+}
+
+// Congela en cada día de la semana los montos YA CALCULADOS (1130/1140/1180/1190,
+// tolerancia, prima dominical, subtotal) usando el salario/ARC vigentes de esa
+// semana (sd.salSnap/arcSnap). Esto queda guardado como dato fijo — un
+// incremento salarial futuro, o incluso una corrección a la fórmula de cálculo,
+// YA NO altera lo que se ve para semanas pasadas: quedó "impreso" igual que un
+// recibo real.
+function congelarMontos(s) {
+  const sd = semData(s);
+  let horasAcum = 0;
+  sd.dias.forEach(d => {
+    const c = calcDia(d, horasAcum, sd.salSnap, sd.arcSnap);
+    horasAcum += c.h;
+    d.montoSnap = {
+      te: c.te, com: c.com, icm: c.icm, tm: c.tm, tet: c.tet,
+      penCCT: c.penCCT, penRecibo: c.penRecibo, primaDom: c.primaDom, sub: c.sub
+    };
+  });
+  sd.congelado = Date.now();
+}
+
+function guardar() {
+  congelarMontos(semana);
+  localStorage.setItem('cte_v4',      JSON.stringify(datos));
+  localStorage.setItem('cte_nivel',   nivel);
+  localStorage.setItem('cte_semana',  semana);
+  localStorage.setItem('cte_jornada', jornada);
+  guardarSemanaFirestoreDebounced();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SINCRONIZACIÓN CON FIRESTORE — una semana = un documento.
+// A diferencia del bin unico de antes, esto NUNCA puede pisar otra
+// semana ni el historial de otro usuario: cada escritura toca
+// solo cuentas/{codigo}/semanas/{sID}.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let syncTimer = null;
+function guardarSemanaFirestoreDebounced() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(guardarSemanaFirestore, 2000); // 2s de inactividad, luego sube
+}
+
+async function guardarSemanaFirestore() {
+  if (!fbCodigo || !fbUid) { setSyncStatus('error'); return; } // sin sesion activa, no hay a donde escribir
+  try {
+    const sd = semData(semana);
+    await db.collection('cuentas').doc(fbCodigo)
+             .collection('semanas').doc('s' + semana)
+             .set(sd);
+    setSyncStatus('ok');
+  } catch (e) {
+    setSyncStatus('error');
+  }
+}
+
+// Se dispara si el usuario minimiza/cierra antes de que pase el debounce
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && syncTimer) {
+    clearTimeout(syncTimer);
+    guardarSemanaFirestore();
+  }
+});
+window.addEventListener('pagehide', () => {
+  if (syncTimer) { clearTimeout(syncTimer); guardarSemanaFirestore(); }
+});
+
+// getUserKey() ya no identifica al usuario (eso lo hace Firebase Auth con
+// fbUid). Se conserva solo como etiqueta visible en pantalla ("ID de respaldo")
+// para que el usuario pueda comparar entre dispositivos si algo se ve raro.
+function getUserKey() {
+  return fbCodigo || fbUid || 'sin-sesion';
+}
+
+// NOTA: fusionarHistoriales() y la vieja syncToCloud() (contra JSONBin) se
+// eliminaron aqui — ya no aplican. En el diseño Firestore cada semana es un
+// documento propio, asi que no puede fragmentarse por activar otro codigo;
+// y la fusion de historiales viejos (como la de Raul) ya se resolvio una
+// vez, en el script de migracion, antes de subir los datos.
+
+async function restaurarDesdeNube() {
+  if (!fbCodigo) return false;   // sin codigo canjeado, no hay cuenta que leer
+  try {
+    const cuentaRef = db.collection('cuentas').doc(fbCodigo);
+    const cuentaSnap = await cuentaRef.get();
+    if (!cuentaSnap.exists) return false;
+
+    const perfil = cuentaSnap.data();
+    nivel   = perfil.nivel   || nivel;
+    jornada = perfil.jornada || jornada;
+
+    const semanasSnap = await cuentaRef.collection('semanas').get();
+    if (semanasSnap.empty) return false;
+
+    datos = {};
+    semanasSnap.forEach(d => { datos[d.id] = d.data(); });
+
+    localStorage.setItem('cte_v4',      JSON.stringify(datos));
+    localStorage.setItem('cte_nivel',   nivel);
+    localStorage.setItem('cte_jornada', jornada);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function setSyncStatus(estado) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  if (estado === 'ok') {
+    el.textContent = '☁️ Respaldado';
+    el.style.color = 'var(--blue, #1A3A6B)';
+  } else {
+    el.textContent = '⚠️ Sin conexión — se reintentará';
+    el.style.color = 'var(--red, #B52B27)';
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// VALIDACIÓN DE CÓDIGOS DE ACCESO
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Canje de codigo. Ya NO decide nada por si mismo: propone una escritura
+// y deja que firestore.rules acepte o rechace. Dos caminos posibles:
+//  - Primer canje (codigo virgen): pide codigo + telefono completo.
+//  - Dispositivo nuevo (codigo con dueño): pide codigo + ultimos 4 digitos.
+// La app detecta cual aplica leyendo el documento antes de intentar.
+async function validarCodigo() {
+  const input = document.getElementById('unlock-inp');
+  const telInput = document.getElementById('unlock-tel'); // agregar este campo al HTML del paywall
+  const msg = document.getElementById('unlock-msg');
+  const raw = (input.value || '').trim().toUpperCase();
+  const tel = (telInput ? telInput.value : '').trim();
+
+  if (!raw) { msg.innerText = "Escribe un código."; return; }
+  if (!tel) { msg.innerText = "Escribe tu número de teléfono."; return; }
+  if (!fbUid) {
+    msg.innerText = "Conectando...";
+    try {
+      const cred = await auth.signInAnonymously();
+      fbUid = cred.user.uid;
+    } catch (e) {
+      msg.className = "unlock-msg err";
+      msg.innerText = "Sin conexión. Intenta de nuevo.";
+      return;
+    }
+  }
+  msg.innerText = "Verificando...";
+
+  const ref = db.collection('cuentas').doc(raw);
+
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) {
+      msg.className = "unlock-msg err";
+      msg.innerText = "Código no válido.";
+      return;
+    }
+
+    const cuenta = snap.data();
+    const esPrimerCanje = (cuenta.uids || []).length === 0;
+
+    if (esPrimerCanje) {
+      await ref.update({
+        uids: firebase.firestore.FieldValue.arrayUnion(fbUid),
+        telHash:  hashSimple(tel),
+        tel4Hash: hashSimple(tel.slice(-4))
+      });
+    } else {
+      // Dispositivo nuevo: el campo tel4 del input se compara contra
+      // tel4Hash guardado. Si no coincide, la regla rechaza sola.
+      await ref.update({
+        uids: firebase.firestore.FieldValue.arrayUnion(fbUid),
+        intento4: hashSimple(tel.slice(-4))
+      });
+    }
+
+    fbCodigo = raw;
+    localStorage.setItem('cte_codigo', raw);
+
+    let dias = cuenta.plan === 'week' ? 7 : (cuenta.plan === 'month' ? 30 : 365);
+    setLicencia({
+      code: raw,
+      activado: Date.now(),
+      expira: cuenta.expira || (Date.now() + dias * 24 * 60 * 60 * 1000)
+    });
+
+    msg.className = "unlock-msg ok";
+    msg.innerText = "¡Activado! Buscando tu historial...";
+    await restaurarDesdeNube();
+    setTimeout(() => location.reload(), 1500);
+
+  } catch (err) {
+    // Aqui caen los rechazos de las reglas: codigo ya tiene dueño y
+    // los 4 digitos no coinciden, o cualquier otro intento no autorizado.
+    msg.className = "unlock-msg err";
+    msg.innerText = "No se pudo activar. Verifica tu código y teléfono.";
+  }
+}
+
+async function initApp() {
+  const splash = document.getElementById('splash');
+
+  // PRIMER PASO SIEMPRE: autenticar con Firebase. Sin esto, ninguna
+  // lectura/escritura a Firestore va a funcionar (las reglas exigen
+  // request.auth != null en todos los casos).
+  try {
+    const cred = await auth.signInAnonymously();
+    fbUid = cred.user.uid;
+  } catch (e) {
+    fbUid = null;
+  }
+
+  fbCodigo = localStorage.getItem('cte_codigo') || null;
+
+  const sinDatosLocales = Object.keys(datos).length === 0;
+  if (sinDatosLocales && fbCodigo) {
+    // Ya hay codigo conocido de una sesion anterior: intenta restaurar
+    const restaurado = await restaurarDesdeNube();
+    if (restaurado) cambiarSemana(0);
+  } else if (!sinDatosLocales && fbCodigo) {
+    // Ya hay datos y sesion: sube un respaldo silencioso de la semana actual
+    guardarSemanaFirestoreDebounced();
+  }
+
+  if (splash) {
+    splash.classList.add('hide');
+    setTimeout(() => { splash.style.display = 'none'; }, 400);
+  }
+  mostrarUidEnPantalla();
+  if (!licenciaActiva()) mostrarPaywall();
+
+  // Verifica si el código fue cancelado por el administrador (expira <= ahora)
+  verificarRevocacion();
+  setInterval(verificarRevocacion, 15 * 60 * 1000);
+}
+
+function actualizarUIEstado() {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-txt');
+  const bar = document.getElementById('free-bar');
+  if (licenciaActiva()) {
+    dot.className = "status-dot active";
+    txt.innerText = "Acceso Full";
+    if (bar) bar.style.display = 'none';
+  }
+}
+
+function contactarWA() {
+  const nombre = document.getElementById('inp-nombre').value;
+  window.open(`https://wa.me/${WA_NUM}?text=Hola, soy ${nombre}. Quiero activar ControlTE.`, '_blank');
+}
+
+function showTab(id) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  if(event) event.currentTarget.classList.add('active');
+}
+
+window.onload = () => { /* El splash se maneja con el botón */ };
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CÁLCULOS CCT 2025-2027 (VERSIÓN FINAL UNIFICADA)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function getTolMin(horas, tipo) {
+  // Cláusula 51: No hay tolerancia en festivos < 12h (aplica J00 y J07)
+  if (tipo === 'festivo' && horas < 12) return 0;
+  const tablaTol = {
+    4: 20, 5: 40, 6: 60, 7: 80, 8: 100, 9: 120,
+    10: 140, 11: 160, 12: 180, 13: 200, 14: 220, 15: 240, 16: 260
+  };
+  return tablaTol[horas] || 0;
+}
+
+function getComidas(horas, tipo) {
+  const j = jornada;
+
+  if (tipo === 'festivo' || tipo === 'descanso') {
+    if (horas >= 12) return 2;
+    if (horas >= 2)  return 1;
+    return 0;
+  }
+
+  if (j === '07') {
+    // Jornada 07: 2h=1 comida, 8h+=2 comidas
+    if (horas >= 8) return 2;
+    if (horas >= 2) return 1;
+    return 0;
+  } else {
+    // Jornada 00: 2h=1 comida, 5h+=2 comidas
+    if (horas >= 5) return 2;
+    if (horas >= 2) return 1;
+    return 0;
+  }
+}
+
+function calcDia(d, horasPrevias, salSnap, arcSnap) {
+  const h = d.horas || 0;
+  const t = d.tipo || 'normal';
+  const fechaObj = new Date(d.fecha + 'T12:00');
+  const esDomingo = fechaObj.getDay() === 0;
+
+  // Usa el salario/ARC vigente AL MOMENTO de esa semana (snapshot) si viene
+  // dado; si no (llamadas antiguas), cae al nivel actual como antes.
+  const salTab = salSnap !== undefined ? salSnap : TAB[nivel];
+  const arc    = arcSnap !== undefined ? arcSnap : ARC[nivel]; // Ayuda Renta Casa por nivel (Anexo 1)
+
+  // --- 1130: TIEMPO EXTRA OCASIONAL (Cláusula 193) ---
+  const baseCalculo    = salTab + (salTab * 0.60) + arc;
+  const valorHoraExtra = (baseCalculo / 8) * 2;
+  const te = Math.round((h * valorHoraExtra) * 100) / 100;
+
+  // --- 1180: TOLERANCIA ---
+  const minTol = getTolMin(h, t);
+  const tet = Math.round(((minTol / 60) * valorHoraExtra) * 100) / 100;
+
+  // --- 1190: TIEMPO PENADO (desde la hora 13 acumulada en la semana) ---
+  const horasAnteriores = horasPrevias || 0;
+  const horasDesde13    = Math.max(0, (horasAnteriores + h) - 12) - Math.max(0, horasAnteriores - 12);
+  const penCCT    = Math.round((horasDesde13 * ((salTab / 8) + valorHoraExtra)) * 100) / 100;
+  const penRecibo = Math.round((horasDesde13 * (salTab / 8))                    * 100) / 100;
+
+  // --- PRIMA DOMINICAL (35%) ---
+  let primaDom = 0;
+  if (esDomingo && h > 0) {
+    const salOrd = salTab + (salTab * 0.30) + arc;
+    primaDom = Math.round((h * (salOrd / 8) * 0.35) * 100) / 100;
+  }
+
+  // --- 1140: COMIDAS ---
+  const com = getComidas(h, t);
+  const icm = Math.round((com * 187.75) * 100) / 100;
+
+  const subTotal = Math.round((te + icm + tet + penCCT + primaDom) * 100) / 100;
+
+  return { h, t, te, com, icm, tm: minTol, tet, penCCT, penRecibo, primaDom, sub: h > 0 ? subTotal : 0 };
+}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FORMATO
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const f$ = n => n === 0 ? '<span class="z">—</span>'
+  : '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fDate = iso => new Date(iso+'T12:00').toLocaleDateString('es-MX', {day:'2-digit', month:'short'});
+const fTol  = m => m ? `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}` : null;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// UI ESTADO
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function actualizarEstado() {
+  const dot  = document.getElementById('status-dot');
+  const txt  = document.getElementById('status-txt');
+  const bar  = document.getElementById('free-bar');
+  const ftxt = document.getElementById('free-txt');
+  const fsub = document.getElementById('free-sub');
+  const fw1  = document.getElementById('fw1');
+  const fw2  = document.getElementById('fw2');
+
+  if (licenciaActiva()) {
+    const dias = diasRestantes();
+    const lic  = getLicencia();
+    const nom  = { week:'semana', month:'mes', year:'año', trial:'prueba' };
+    dot.className  = 'status-dot active';
+    txt.textContent = `✓ Activo — ${dias} días`;
+    bar.style.display = 'none';   // la barra de "semanas gratis" ya no aplica
+  } else {
+    dot.className  = 'status-dot free';
+    txt.textContent = 'Sin acceso';
+    bar.style.display = 'block';
+    bar.style.borderLeftColor = 'var(--red, #B52B27)';
+    ftxt.innerHTML = '<b>Sin código activo</b>';
+    fsub.textContent = 'Escribe tu código de acceso para empezar a capturar.';
+    fw1.style.display = 'none';
+    fw2.style.display = 'none';
+  }
+}
+
+function verEstado() {
+  if (!licenciaActiva()) mostrarPaywall();
+}
+
+function mostrarPaywall() {
+  document.getElementById('paywall').classList.add('show');
+  selPlan('month');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// RENDER PRINCIPAL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function render() {
+  actualizarEstado();
+  const sd = semData(semana);
+
+  document.getElementById('wnum').textContent = `Semana ${semana}`;
+  document.getElementById('wrng').textContent = `${fDate(sd.dias[0].fecha)} – ${fDate(sd.dias[6].fecha)}`;
+  const btn = document.getElementById('btn-pag');
+  btn.textContent = sd.pagado ? '✓ Pagada' : '✓ Marcar pagado';
+  btn.className   = 'nav-btn' + (sd.pagado ? ' paid' : '');
+
+  // DÍAS
+  const grid = document.getElementById('days-grid');
+  grid.innerHTML = '';
+  sd.dias.forEach((d, i) => {
+    const el = document.createElement('div');
+    el.className = `day-card ${d.tipo !== 'normal' ? d.tipo : ''}`;
+    el.innerHTML = `
+      <div class="day-name">${DNOM[i]}</div>
+      <div class="day-date">${fDate(d.fecha)}</div>
+      <div class="day-tag ${d.tipo}">${d.tipo === 'normal' ? '·' : d.tipo}</div>
+      <input class="hrs-inp" type="number" min="0" max="24"
+        ${d.horas === 0 ? 'placeholder="0"' : `value="${d.horas}"`}
+        onfocus="if(this.value==='0'||this.value===''){this.value='';}"
+        onblur="if(this.value===''||isNaN(this.value)){this.value='';setH(${i},0);}"
+        oninput="setH(${i},this.value)">
+      <div class="hrs-lbl">horas extra</div>
+      <div class="type-row">
+        <button class="type-btn ${d.tipo==='normal'?'on-n':''}"   onclick="setT(${i},'normal')">Nor</button>
+        <button class="type-btn ${d.tipo==='festivo'?'on-f':''}"  onclick="setT(${i},'festivo')">Fes</button>
+        <button class="type-btn ${d.tipo==='descanso'?'on-d':''}" onclick="setT(${i},'descanso')">Des</button>
+      </div>`;
+    grid.appendChild(el);
+  });
+
+  // TABLA
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  let tH=0,tTE=0,tC=0,tIC=0,tTM=0,tTET=0,tPcct=0,tS=0;
+  let horasAcum = 0;
+
+  sd.dias.forEach((d, i) => {
+    const c = calcDia(d, horasAcum, sd.salSnap, sd.arcSnap);
+    horasAcum += c.h;
+    const tag = c.t !== 'normal' ? `<span class="tag-${c.t[0]}">[${c.t}]</span>` : '';
+    const hhmm = fTol(c.tm);
+    const tr = document.createElement('tr');
+    if (c.h === 0) tr.className = 'zrow';
+    tr.innerHTML = `
+      <td>${DNOM[i]} ${fDate(d.fecha)}${tag}</td>
+      <td>${c.h || '<span class="z">—</span>'}</td>
+      <td>${hhmm ? `<span class="tol-hhmm">${hhmm}</span><span class="tol-min">${c.tm} min</span>` : '<span class="z">—</span>'}</td>
+      <td>${f$(c.te)}</td>
+      <td>${c.com || '<span class="z">—</span>'}</td>
+      <td>${f$(c.icm)}</td>
+      <td>${f$(c.tet)}</td>
+      <td style="color:var(--gold)">${f$(c.penCCT)}</td>
+      <td>${c.h > 0 ? f$(c.sub) : '<span class="z">—</span>'}</td>`;
+    tb.appendChild(tr);
+    tH+=c.h; tTE+=c.te; tC+=c.com; tIC+=c.icm; tTM+=c.tm; tTET+=c.tet;
+    tPcct+=c.penCCT; tS+=c.sub;
+  });
+
+  const totHHMM = fTol(tTM);
+  const trT = document.createElement('tr'); trT.className = 'trow';
+  trT.innerHTML = `
+    <td>TOTAL SEMANA</td><td>${tH}</td>
+    <td>${totHHMM ? `<b>${totHHMM}</b><span class="tol-min">${tTM} min</span>` : '<span class="z">—</span>'}</td>
+    <td>${f$(tTE)}</td><td>${tC||'<span class="z">—</span>'}</td>
+    <td>${f$(tIC)}</td><td>${f$(tTET)}</td>
+    <td style="color:var(--gold)">${f$(tPcct)}</td>
+    <td>${f$(tS)}</td>`;
+  tb.appendChild(trT);
+
+  const trG = document.createElement('tr'); trG.className = 'grow';
+  trG.innerHTML = `<td colspan="8" style="text-align:left;color:rgba(255,255,255,.7)">IMPORTE TOTAL A COBRAR &nbsp;(1130 + 1140 + 1180 + 1190 CCT)</td><td>${f$(tS)}</td>`;
+  tb.appendChild(trG);
+
+  // CARDS
+  document.getElementById('scards').innerHTML = `
+    <div class="scard"><div class="scard-lbl">Total horas</div><div class="scard-val">${tH}<span class="scard-unit">hrs</span></div></div>
+    <div class="scard"><div class="scard-lbl">Tolerancia total</div><div class="scard-val" style="font-size:16px">${totHHMM||'—'}<span class="scard-unit">h:mm</span></div></div>
+    <div class="scard" style="border-color:var(--gold);background:#fffbf0"><div class="scard-lbl" style="color:var(--gold)">🍽 Comidas semana</div><div class="scard-val" style="color:var(--gold)">${tC}<span class="scard-unit">comidas</span></div><div style="font-size:10px;color:var(--red);font-weight:700;margin-top:4px">$${tIC.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
+    <div class="scard"><div class="scard-lbl">T.E. medido 1130</div><div class="scard-val" style="font-size:15px">$${tTE.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
+    <div class="scard" style="border-color:var(--gold)"><div class="scard-lbl" style="color:var(--gold)">1190 T.penado CCT</div><div class="scard-val" style="font-size:15px;color:var(--gold)">$${tPcct.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
+    <div class="scard hl"><div class="scard-lbl">Total a cobrar (CCT)</div><div class="scard-val">$${tS.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>`;
+
+  guardar();
+  renderHist();
+  renderRefTasas();
+}
+
+function setCatorcena(s, val) {
+  datos['s'+s].catorcena = parseInt(val) || 0;
+  guardar();
+}
+
+function renderHist() {
+  const list = document.getElementById('hlist');
+  list.innerHTML = '';
+  const sems = Object.keys(datos).map(k => parseInt(k.slice(1))).sort((a,b) => b-a);
+  if (!sems.length) {
+    list.innerHTML = '<p style="padding:24px;text-align:center;color:var(--mid)">No hay semanas registradas aún.</p>';
+    return;
+  }
+  sems.forEach(s => {
+    const sd = datos['s'+s]; let tH=0, tS=0;
+    sd.dias.forEach(d => {
+      if (d.montoSnap) { tH += d.horas||0; tS += d.montoSnap.sub; }
+      else { const c=calcDia(d,0,sd.salSnap,sd.arcSnap); tH+=c.h; tS+=c.sub; }
+    });
+    if (tH === 0 && !sd.pagado) return;
+
+    // Opciones de catorcena 1-26
+    const catOpts = `<option value="0">-- Catorcena --</option>` +
+      Array.from({length:26}, (_,i) => {
+        const n = i+1;
+        const sel = (sd.catorcena === n) ? 'selected' : '';
+        return `<option value="${n}" ${sel}>Catorcena ${String(n).padStart(2,'0')}</option>`;
+      }).join('');
+
+    const el = document.createElement('div');
+    el.className = `hitem ${sd.pagado?'paid':''}`;
+    el.innerHTML = `
+      <div style="flex:1">
+        <div class="hwk">Semana ${s}</div>
+        <div class="hdet">${tH} hrs · ${fDate(sd.dias[0].fecha)} – ${fDate(sd.dias[6].fecha)}</div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <select onchange="setCatorcena(${s},this.value)" onclick="event.stopPropagation()"
+            style="background:var(--paper);border:1.5px solid var(--rule);border-radius:6px;padding:5px 8px;font-size:11px;font-family:'DM Sans',sans-serif;color:var(--ink);outline:none;cursor:pointer;">
+            ${catOpts}
+          </select>
+          ${sd.catorcena ? `<span style="font-size:10px;font-weight:700;color:var(--blue)">✓ Cat. ${String(sd.catorcena).padStart(2,'0')}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <div class="htot">$${tS.toLocaleString('es-MX',{minimumFractionDigits:2})}</div>
+        <div class="hbdg ${sd.pagado?'pg':'pe'}">${sd.pagado?'Pagado':'Pendiente'}</div>
+      </div>`;
+    el.querySelector('div').addEventListener('click', (e) => {
+      if (e.target.tagName !== 'SELECT') { semana=s; showTab('captura'); render(); }
+    });
+    list.appendChild(el);
+  });
+}
+
+function renderRefTasas() {
+  const sal = TAB[nivel];
+  const arc = ARC[nivel];
+  const h   = horaTE();
+  document.getElementById('ref-tasas').innerHTML = `
+    <div class="rrow"><span>Nivel</span><span>${nivel}</span></div>
+    <div class="rrow"><span>Salario tabulado diario</span><span>$${sal.toFixed(2)}</span></div>
+    <div class="rrow"><span>Ayuda renta de casa (ARC)</span><span>$${arc.toFixed(2)}</span></div>
+    <div class="rrow"><span>Hora extra (1130) = (sal+60%sal+arc)÷8×2</span><span>$${h.toFixed(4)}</span></div>
+    <div class="rrow"><span>Comida (1140)</span><span>$${TASA_COMIDA.toFixed(2)} c/u</span></div>
+    <div class="rrow"><span>TE Tolerancia (1180) = h×$hora×12.3%</span><span>${(TOL_PCT*100).toFixed(1)}%</span></div>
+    <div class="rrow" style="background:#fff8e6"><span>T. penado CCT (1190) = (sal÷8)+hora_TE · desde hr 13</span><span style="color:var(--gold)">$${penHoraCCT().toFixed(4)}/hr</span></div>`;
+}
+
+function renderRef() {
+  const j = localStorage.getItem('cte_jornada') || '00';
+  const td=[[2,0],[4,20],[5,40],[6,60],[7,80],[8,100],[9,120],[10,140],[11,160],[12,180],[13,200],[14,220],[15,240],[16,260]];
+  document.getElementById('ref-tol').innerHTML = td.map(([h,m]) => `
+    <div class="rrow ${m===0?'na':''}">
+      <span>${h} horas</span>
+      <span>${m>0?`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')} (${m} min)`:'No aplica'}</span>
+    </div>`).join('');
+
+  // Comidas según jornada activa
+  const TASA_COMIDA = 187.75;
+  if (j === '07') {
+    document.getElementById('ref-com').innerHTML = `
+      <div class="rbox-hd" style="background:#fff3d0;color:var(--gold);font-size:10px;padding:6px 14px;border-bottom:1px solid var(--rule);">Jornada 07 — Día normal</div>
+      <div class="rrow na"><span>Menos de 2 hrs</span><span>Sin comida</span></div>
+      <div class="rrow"><span>2 a 7 hrs</span><span>1 comida ($${(1*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rrow"><span>8 hrs o más</span><span>2 comidas ($${(2*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rbox-hd" style="background:#f0e8ff;color:var(--purple);font-size:10px;padding:6px 14px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);">Jornada 07 — Festivo / Descanso</div>
+      <div class="rrow na"><span>Menos de 2 hrs</span><span>Sin comida</span></div>
+      <div class="rrow"><span>2 a 11 hrs</span><span>1 comida ($${(1*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rrow"><span>12 hrs o más</span><span>2 comidas ($${(2*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rrow na" style="font-size:11px;color:var(--red);"><span colspan="2">⚠️ Sin tolerancia en días festivos</span><span></span></div>`;
+  } else {
+    document.getElementById('ref-com').innerHTML = `
+      <div class="rbox-hd" style="background:#e8f0ff;color:var(--blue);font-size:10px;padding:6px 14px;border-bottom:1px solid var(--rule);">Jornada 00 — Día normal</div>
+      <div class="rrow na"><span>Menos de 2 hrs</span><span>Sin comida</span></div>
+      <div class="rrow"><span>2 a 4 hrs</span><span>1 comida ($${(1*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rrow"><span>5 hrs o más</span><span>2 comidas ($${(2*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rbox-hd" style="background:#f0e8ff;color:var(--purple);font-size:10px;padding:6px 14px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);">Jornada 00 — Festivo / Descanso</div>
+      <div class="rrow na"><span>Menos de 2 hrs</span><span>Sin comida</span></div>
+      <div class="rrow"><span>2 a 11 hrs</span><span>1 comida ($${(1*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rrow"><span>12 hrs o más</span><span>2 comidas ($${(2*TASA_COMIDA).toFixed(2)})</span></div>
+      <div class="rrow na" style="font-size:11px;color:var(--red);"><span colspan="2">⚠️ Sin tolerancia en días festivos</span><span></span></div>`;
+  }
+  renderRefTasas();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CONTROLES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function setH(i, v) {
+  const nuevas_horas = Math.max(0, parseInt(v) || 0);
+  if (nuevas_horas > 0 && !puedeUsarSemana(semana)) {
+    document.querySelector(`#days-grid .day-card:nth-child(${i+1}) .hrs-inp`).value = 0;
+    mostrarPaywall();
+    return;
+  }
+  semData(semana).dias[i].horas = nuevas_horas;
+  guardar();   // FIX: sin esto, las horas solo vivían en memoria y se perdían al recargar
+  render();
+}
+function setT(i, t) { semData(semana).dias[i].tipo = t; guardar(); render(); }   // FIX: mismo hoyo
+function cambiarSemana(d) {
+  const nueva = Math.max(1, semana + d);
+  if (d > 0 && !puedeUsarSemana(nueva)) {
+    semana = nueva;
+    render();
+    mostrarPaywall();
+    return;
+  }
+  semana = nueva;
+  guardar();   // FIX: persiste la posicion (cte_semana) y la estructura creada al visitar
+  render();
+}
+function marcarPagado() { const sd=semData(semana); sd.pagado=!sd.pagado; guardar(); render(); }   // FIX: mismo hoyo
+
+function cambiarJornada() {
+  jornada = document.getElementById('sel-jornada').value;
+  guardar();
+  render();
+  renderRef();
+}
+
+function cambiarNivel() {
+  nivel = parseInt(document.getElementById('sel-nivel').value);
+  document.getElementById('sel-nivel2').value = nivel;
+  const sal = TAB[nivel];
+  document.getElementById('chip-sal').textContent  = `$${sal.toFixed(2)}/día`;
+  document.getElementById('chip-hora').textContent = `$${horaTE().toFixed(2)}`;
+  document.getElementById('sal-visible').textContent = `$${sal.toFixed(2)}`;
+  guardar();   // FIX: el nivel elegido no se persistia hasta que otra accion llamara guardar()
+  render();
+}
+function showTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  ['captura','historial','cotejador','referencia','soporte'].forEach((n,i) => {
+    if (n === id) document.querySelectorAll('.tab-btn')[i].classList.add('active');
+  });
+}
+function selPlan(p) {
+  planSel = p;
+  ['week','month','year'].forEach(x => {
+    document.getElementById('plan-'+x).classList.toggle('selected', x===p);
+  });
+}
+function contactarWA() {
+  const user = document.getElementById('inp-nombre').value || 'usuario';
+  const msg  = encodeURIComponent(
+    `Hola! Soy ${user}, quiero desbloquear ControlTE para seguir registrando mis semanas de tiempo extra. ¿Cómo procedo?`
+  );
+  window.open(`https://wa.me/${WA_NUM}?text=${msg}`, '_blank');
+}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// INIT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const sel = document.getElementById('sel-nivel');
+const sel2 = document.getElementById('sel-nivel2');
+Object.keys(TAB).sort((a,b) => a-b).forEach(n => {
+  [sel, sel2].forEach(s => {
+    const o = document.createElement('option');
+    o.value = n;
+    o.textContent = `Nivel ${n}  —  $${TAB[n].toFixed(2)}/día`;
+    if (parseInt(n) === nivel) o.selected = true;
+    s.appendChild(o);
+  });
+});
+document.getElementById('chip-sal').textContent  = `$${TAB[nivel].toFixed(2)}/día`;
+document.getElementById('chip-hora').textContent = `$${horaTE().toFixed(2)}`;
+document.getElementById('sal-visible').textContent = `$${TAB[nivel].toFixed(2)}`;
+
+// Restaurar jornada guardada
+document.getElementById('sel-jornada').value = jornada;
+
+// Si ya la usó antes, no mostrar splash
+if (localStorage.getItem('cte_v4')) {
+  document.getElementById('splash').style.display = 'none';
+}
+
+renderRef();
+render();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COTEJADOR DE RECIBO — integrado desde ControlTE_CotejadorRecibo.html
+// Envuelto en IIFE para no chocar con nombres ya usados arriba (f$, fDate,
+// sel, etc.). Usa las mismas TAB/ARC/TASA_COMIDA globales del archivo
+// principal — no las vuelve a declarar.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function(){
+
+function horaTECot(niv) {
+  return ((TAB[niv] + TAB[niv] * 0.60 + ARC[niv]) / 8) * 2;
+}
+function penHoraCCTCot(niv) {
+  return (TAB[niv] / 8) + horaTECot(niv);
+}
+function penHoraReciboCot(niv) {
+  return TAB[niv] / 8;
+}
+
+function decodificar(niv, m1130, m1140, m1180, m1190) {
+  const hte    = horaTECot(niv);
+  const hpen_r = penHoraReciboCot(niv);
+  const hpen_c = penHoraCCTCot(niv);
+  const result = {};
+  result.horas_1130 = m1130 > 0 ? Math.round((m1130 / hte) * 100) / 100 : 0;
+  result.comidas = m1140 > 0 ? Math.round(m1140 / TASA_COMIDA) : 0;
+  result.comidas_exactas = m1140 > 0 ? m1140 / TASA_COMIDA : 0;
+  result.horas_tol = m1180 > 0 ? Math.round((m1180 / hte) * 100) / 100 : 0;
+  const minTol_exactos = m1180 > 0 ? Math.round((m1180 / hte) * 60 * 10) / 10 : 0;
+  result.min_tol_exactos = minTol_exactos;
+  result.horas_pen_recibo = m1190 > 0 ? Math.round((m1190 / hpen_r) * 100) / 100 : 0;
+  result.horas_pen_cct    = m1190 > 0 ? Math.round((m1190 / hpen_c) * 100) / 100 : 0;
+  result.total_horas = result.horas_1130;
+  result.tasa_hora = hte;
+  result.tasa_pen_recibo = hpen_r;
+  result.tasa_pen_cct    = hpen_c;
+  return result;
+}
+
+function leerHistorialCot() {
+  try { return JSON.parse(localStorage.getItem('cte_v4') || '{}'); } catch { return {}; }
+}
+
+// Igual que calcDia() del archivo principal, pero recibe salSnap/arcSnap
+// de la semana (sd.salSnap/sd.arcSnap) en vez de usar el nivel actual —
+// así el cotejo respeta el salario vigente cuando se capturó esa semana,
+// sin importar si tu nivel/salario cambió después.
+function calcDiaHistorialCot(d, horasAcum, salSnap, arcSnap, jornadaSnap) {
+  const h = d.horas || 0;
+  const t = d.tipo || 'normal';
+  const sal = salSnap;
+  const arc = arcSnap;
+  const baseCalculo = sal + (sal * 0.60) + arc;
+  const valorHoraExtra = (baseCalculo / 8) * 2;
+  const te = Math.round((h * valorHoraExtra) * 100) / 100;
+  const TABLA_TOL = {4:20,5:40,6:60,7:80,8:100,9:120,10:140,11:160,12:180,13:200,14:220,15:240,16:260};
+  let minTol = 0;
+  if (!(t === 'festivo' && h < 12)) minTol = TABLA_TOL[h] || 0;
+  const tet = Math.round(((minTol / 60) * valorHoraExtra) * 100) / 100;
+  let com = 0;
+  if (t === 'festivo' || t === 'descanso') {
+    if (h >= 12) com = 2; else if (h >= 2) com = 1;
+  } else if (jornadaSnap === '07') {
+    if (h >= 8) com = 2; else if (h >= 2) com = 1;
+  } else {
+    if (h >= 5) com = 2; else if (h >= 2) com = 1;
+  }
+  const icm = Math.round((com * TASA_COMIDA) * 100) / 100;
+  const horasDesde13 = Math.max(0, (horasAcum + h) - 12) - Math.max(0, horasAcum - 12);
+  const penCCT    = Math.round((horasDesde13 * ((sal / 8) + valorHoraExtra)) * 100) / 100;
+  const penRecibo = Math.round((horasDesde13 * (sal / 8)) * 100) / 100;
+  return { h, t, te, com, icm, minTol, tet, penCCT, penRecibo };
+}
+
+function calcSemanaCot(sd, nivelFallback) {
+  // Usa el snapshot de la semana si existe (semanas capturadas con el
+  // arreglo de sync ya aplicado); si es una semana vieja sin snapshot,
+  // cae al nivel seleccionado en el Cotejador como mejor aproximación.
+  const salSnap = sd.salSnap !== undefined ? sd.salSnap : TAB[nivelFallback];
+  const arcSnap = sd.arcSnap !== undefined ? sd.arcSnap : ARC[nivelFallback];
+  const jornadaSnap = localStorage.getItem('cte_jornada') || '00';
+  let tH=0, tTE=0, tC=0, tIC=0, tTET=0, tPcct=0, tPrec=0, horasAcum=0;
+  sd.dias.forEach(d => {
+    const c = calcDiaHistorialCot(d, horasAcum, salSnap, arcSnap, jornadaSnap);
+    horasAcum += c.h;
+    tH+=c.h; tTE+=c.te; tC+=c.com; tIC+=c.icm; tTET+=c.tet; tPcct+=c.penCCT; tPrec+=c.penRecibo;
+  });
+  return { horas: tH, te: Math.round(tTE*100)/100, comidas: tC, importe_comidas: Math.round(tIC*100)/100, tol: Math.round(tTET*100)/100, penCCT: Math.round(tPcct*100)/100, penRecibo: Math.round(tPrec*100)/100 };
+}
+
+function semanasRelevantesCot(historial, fechaRecibo) {
+  const fd = fechaRecibo ? new Date(fechaRecibo + 'T12:00') : null;
+  const resultados = [];
+  Object.keys(historial).forEach(k => {
+    const sd = historial[k];
+    if (!sd.dias || sd.dias.length === 0) return;
+    const tH = sd.dias.reduce((s, d) => s + (d.horas || 0), 0);
+    if (tH === 0 && !sd.pagado) return;
+    const ini = new Date(sd.dias[0].fecha + 'T12:00');
+    const fin = new Date(sd.dias[6].fecha + 'T12:00');
+    const numSem = parseInt(k.slice(1));
+    let coincideFecha = false, tipoCoinc = '';
+    if (fd) {
+      if (fd >= ini && fd <= fin) { coincideFecha = true; tipoCoinc = 'semana'; }
+      const diffDias = Math.abs((fd - ini) / 86400000);
+      if (!coincideFecha && diffDias <= 28) { coincideFecha = true; tipoCoinc = 'cercana'; }
+    } else {
+      coincideFecha = true; tipoCoinc = 'sin_fecha';
+    }
+    if (coincideFecha) resultados.push({ key: k, numSem, sd, ini, fin, tipoCoinc });
+  });
+  resultados.sort((a, b) => {
+    if (a.tipoCoinc === 'semana' && b.tipoCoinc !== 'semana') return -1;
+    if (b.tipoCoinc === 'semana' && a.tipoCoinc !== 'semana') return 1;
+    return b.numSem - a.numSem;
+  });
+  return resultados;
+}
+
+const f$Cot = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fDateCot = iso => new Date(iso+'T12:00').toLocaleDateString('es-MX', {day:'2-digit', month:'short', year:'numeric'});
+
+function diffBadge(val1, val2, label, tolerancia) {
+  const diff = Math.abs(val1 - val2);
+  const pct  = val2 > 0 ? diff / val2 : (val1 > 0 ? 1 : 0);
+  let cls = 'ok', txt = '✓ Coincide';
+  if (diff > tolerancia) {
+    if (pct > 0.10) { cls = 'err'; txt = `▲ ${f$Cot(diff)}`; }
+    else             { cls = 'warn'; txt = `≈ ${f$Cot(diff)}`; }
+  }
+  return { cls, txt, diff, pct };
+}
+
+window.cotejarRecibo = function() {
+  const nivelSel = parseInt(document.getElementById('inp-nivel').value);
+  const fecha   = document.getElementById('inp-fecha').value;
+  const m1130   = parseFloat(document.getElementById('inp-1130').value) || 0;
+  const m1140   = parseFloat(document.getElementById('inp-1140').value) || 0;
+  const m1180   = parseFloat(document.getElementById('inp-1180').value) || 0;
+  const m1190   = parseFloat(document.getElementById('inp-1190').value) || 0;
+
+  if (m1130 === 0 && m1140 === 0 && m1180 === 0 && m1190 === 0) {
+    alert('Ingresa al menos un monto del recibo para calcular.');
+    return;
+  }
+
+  const dec = decodificar(nivelSel, m1130, m1140, m1180, m1190);
+
+  document.getElementById('res-header').textContent =
+    `Decodificación · Nivel ${nivelSel} · Tasa hora TE: ${f$Cot(dec.tasa_hora)}`;
+
+  const dg = document.getElementById('decode-grid');
+  dg.innerHTML = `
+    <div class="dcard hl">
+      <div class="dcard-lbl">Horas TE (1130)</div>
+      <div class="dcard-val">${dec.horas_1130 > 0 ? dec.horas_1130 : '—'}<span class="dcard-unit">${dec.horas_1130 > 0 ? 'hrs' : ''}</span></div>
+    </div>
+    <div class="dcard gold">
+      <div class="dcard-lbl">Comidas (1140)</div>
+      <div class="dcard-val">${dec.comidas > 0 ? dec.comidas : '—'}<span class="dcard-unit">${dec.comidas > 0 ? 'comidas' : ''}</span></div>
+    </div>
+    <div class="dcard">
+      <div class="dcard-lbl">Tolerancia (1180)</div>
+      <div class="dcard-val">${dec.horas_tol > 0 ? dec.min_tol_exactos.toFixed(1) : '—'}<span class="dcard-unit">${dec.horas_tol > 0 ? 'min' : ''}</span></div>
+    </div>
+    <div class="dcard">
+      <div class="dcard-lbl">Hrs penadas — recibo</div>
+      <div class="dcard-val">${dec.horas_pen_recibo > 0 ? dec.horas_pen_recibo : '—'}<span class="dcard-unit">${dec.horas_pen_recibo > 0 ? 'hrs' : ''}</span></div>
+    </div>
+    <div class="dcard" style="border-right:none">
+      <div class="dcard-lbl">Hrs penadas — CCT</div>
+      <div class="dcard-val gold" style="color:#b07d2a">${dec.horas_pen_cct > 0 ? dec.horas_pen_cct : '—'}<span class="dcard-unit"></span></div>
+    </div>
+    <div class="dcard green" style="border-right:none">
+      <div class="dcard-lbl">Total importe recibo</div>
+      <div class="dcard-val" style="font-size:15px">${f$Cot(m1130+m1140+m1180+m1190)}</div>
+    </div>
+    <div class="dcard" style="border-right:none">
+      <div class="dcard-lbl">Tasa hora penada · recibo</div>
+      <div class="dcard-val" style="font-size:13px">${f$Cot(dec.tasa_pen_recibo)}<span class="dcard-unit">/hr</span></div>
+    </div>
+    <div class="dcard" style="border-right:none">
+      <div class="dcard-lbl">Tasa hora penada · CCT</div>
+      <div class="dcard-val" style="font-size:13px;color:#b07d2a">${f$Cot(dec.tasa_pen_cct)}<span class="dcard-unit">/hr</span></div>
+    </div>`;
+
+  const tolNote = document.getElementById('tol-note');
+  const notas = [];
+  if (dec.comidas_exactas > 0 && Math.abs(dec.comidas_exactas - dec.comidas) > 0.01) {
+    notas.push(`⚠️ Las comidas no son múltiplo exacto de $${TASA_COMIDA}: el monto 1140 implica <b>${dec.comidas_exactas.toFixed(3)}</b> comidas (se redondea a ${dec.comidas}).`);
+  }
+  if (notas.length) { tolNote.innerHTML = notas.join('<br>'); tolNote.style.display = 'block'; }
+  else { tolNote.style.display = 'none'; }
+
+  const historial = leerHistorialCot();
+  const area = document.getElementById('cotejo-area');
+  const semanas = semanasRelevantesCot(historial, fecha);
+
+  if (Object.keys(historial).length === 0) {
+    area.innerHTML = `<div class="cotejo-card">
+      <div class="cotejo-header no-match">Sin historial disponible</div>
+      <div class="no-historial">No se encontró historial de ControlTE en este navegador.</div>
+    </div>`;
+  } else if (semanas.length === 0) {
+    area.innerHTML = `<div class="cotejo-card">
+      <div class="cotejo-header no-match">⚠️ Sin semanas en el rango de fecha</div>
+      <div class="no-historial">No hay semanas registradas cercanas a <b>${fecha ? fDateCot(fecha) : 'la fecha indicada'}</b>.</div>
+    </div>`;
+  } else {
+    let html = '';
+    semanas.slice(0, 5).forEach(({ key, numSem, sd, tipoCoinc }) => {
+      const datos_sem = calcSemanaCot(sd, nivelSel);
+      const usandoSnapshot = sd.salSnap !== undefined;
+      const totalRecibo = m1130 + m1140 + m1180 + m1190;
+      const totalHistorial = datos_sem.te + datos_sem.importe_comidas + datos_sem.tol + datos_sem.penCCT;
+
+      const d1130 = diffBadge(m1130, datos_sem.te, '1130', 1.00);
+      const d1140 = diffBadge(m1140, datos_sem.importe_comidas, '1140', 0.50);
+      const d1180 = diffBadge(m1180, datos_sem.tol, '1180', 1.00);
+      const d1190cct = diffBadge(m1190, datos_sem.penCCT, '1190 CCT', 1.00);
+      const d1190rec = diffBadge(m1190, datos_sem.penRecibo, '1190 recibo', 1.00);
+
+      const errores = [d1130, d1140, d1180].filter(d => d.cls === 'err').length;
+      const warns   = [d1130, d1140, d1180].filter(d => d.cls === 'warn').length;
+      let matchCls = 'match', matchIcon = '✅', matchTxt = 'Coincidencia alta';
+      if (errores >= 2) { matchCls = 'error'; matchIcon = '❌'; matchTxt = 'No coincide'; }
+      else if (errores === 1 || warns >= 2) { matchCls = 'no-match'; matchIcon = '⚠️'; matchTxt = 'Coincidencia parcial'; }
+
+      const etqFecha = tipoCoinc === 'semana' ? '📅 Fecha dentro del rango' : tipoCoinc === 'cercana' ? '📅 Semana cercana' : '📋 En historial';
+      const pagadoTag = sd.pagado ? '<span style="color:#2a6e3f;font-size:10px;"> · ✓ Pagada</span>' : '<span style="color:#b07d2a;font-size:10px;"> · ⏳ Pendiente</span>';
+      const catTag = sd.catorcena ? `<span style="font-size:10px;color:var(--blue);margin-left:6px;">Cat. ${String(sd.catorcena).padStart(2,'0')}</span>` : '';
+      const snapTag = usandoSnapshot
+        ? `<span style="font-size:9px;color:#2a6e3f;margin-left:6px;" title="Se usó el salario congelado de esa semana">🔒 salario histórico</span>`
+        : `<span style="font-size:9px;color:#b07d2a;margin-left:6px;" title="Semana sin snapshot — se usó el nivel seleccionado arriba">⚠️ sin snapshot</span>`;
+
+      html += `<div class="cotejo-card" style="margin-bottom:14px;">
+        <div class="cotejo-header ${matchCls}">
+          <div>${matchIcon} Semana ${numSem} — ${fDateCot(sd.dias[0].fecha)} al ${fDateCot(sd.dias[6].fecha)} ${pagadoTag}${catTag}${snapTag}</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge-match ${matchCls === 'match' ? 'ok' : matchCls === 'no-match' ? 'warn' : 'err'}">${matchTxt}</span>
+            <span style="font-size:10px;opacity:.7">${etqFecha}</span>
+          </div>
+        </div>
+        <div class="cotejo-body">
+          <div class="cotejo-row">
+            <span>Concepto</span>
+            <div class="vals" style="gap:8px;">
+              <span style="font-size:10px;color:var(--blue);font-weight:700;">Recibo</span>
+              <span style="font-size:10px;color:#2a6e3f;font-weight:700;">Historial CCT</span>
+              <span style="font-size:10px;color:var(--mid);font-weight:700;">Diferencia</span>
+            </div>
+          </div>
+          ${m1130 > 0 || datos_sem.te > 0 ? `
+          <div class="cotejo-row">
+            <span>1130 T.E. medido (${dec.horas_1130} hrs vs ${datos_sem.horas} hrs)</span>
+            <div class="vals">
+              <span class="val-recibo">${f$Cot(m1130)}</span>
+              <span class="val-historial">${f$Cot(datos_sem.te)}</span>
+              <span class="val-diff ${d1130.cls}">${d1130.txt}</span>
+            </div>
+          </div>` : ''}
+          ${m1140 > 0 || datos_sem.importe_comidas > 0 ? `
+          <div class="cotejo-row">
+            <span>1140 Comidas (${dec.comidas} vs ${datos_sem.comidas})</span>
+            <div class="vals">
+              <span class="val-recibo">${f$Cot(m1140)}</span>
+              <span class="val-historial">${f$Cot(datos_sem.importe_comidas)}</span>
+              <span class="val-diff ${d1140.cls}">${d1140.txt}</span>
+            </div>
+          </div>` : ''}
+          ${m1180 > 0 || datos_sem.tol > 0 ? `
+          <div class="cotejo-row">
+            <span>1180 TE Tolerancia</span>
+            <div class="vals">
+              <span class="val-recibo">${f$Cot(m1180)}</span>
+              <span class="val-historial">${f$Cot(datos_sem.tol)}</span>
+              <span class="val-diff ${d1180.cls}">${d1180.txt}</span>
+            </div>
+          </div>` : ''}
+          ${m1190 > 0 || datos_sem.penCCT > 0 ? `
+          <div class="cotejo-row">
+            <span>1190 T. penado — vs CCT Cláusula 193</span>
+            <div class="vals">
+              <span class="val-recibo">${f$Cot(m1190)}</span>
+              <span class="val-historial" style="color:#b07d2a">${f$Cot(datos_sem.penCCT)}</span>
+              <span class="val-diff ${d1190cct.cls}">${d1190cct.txt}</span>
+            </div>
+          </div>
+          <div class="cotejo-row" style="background:#fafafa;">
+            <span style="font-size:11px;color:var(--mid)">1190 T. penado — vs fórmula recibo (sal÷8)</span>
+            <div class="vals">
+              <span class="val-recibo">${f$Cot(m1190)}</span>
+              <span class="val-historial">${f$Cot(datos_sem.penRecibo)}</span>
+              <span class="val-diff ${d1190rec.cls}">${d1190rec.txt}</span>
+            </div>
+          </div>` : ''}
+          <div class="cotejo-row" style="background:var(--rule);font-weight:700;">
+            <span>TOTAL</span>
+            <div class="vals">
+              <span class="val-recibo">${f$Cot(totalRecibo)}</span>
+              <span class="val-historial">${f$Cot(totalHistorial)}</span>
+              <span class="val-diff ${Math.abs(totalRecibo-totalHistorial) < 2 ? 'ok' : Math.abs(totalRecibo-totalHistorial) < totalHistorial*0.10 ? 'warn' : 'err'}">
+                ${Math.abs(totalRecibo-totalHistorial) < 2 ? '✓' : f$Cot(Math.abs(totalRecibo-totalHistorial))}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    });
+    area.innerHTML = html;
+  }
+
+  document.getElementById('resultado').style.display = 'block';
+  document.getElementById('resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// Poblar selector de nivel del Cotejador
+const selCot = document.getElementById('inp-nivel');
+const nivelGuardadoCot = parseInt(localStorage.getItem('cte_nivel') || 21);
+Object.keys(TAB).sort((a,b) => a-b).forEach(n => {
+  const o = document.createElement('option');
+  o.value = n;
+  o.textContent = `Nivel ${n}  —  $${TAB[n].toFixed(2)}/día`;
+  if (parseInt(n) === nivelGuardadoCot) o.selected = true;
+  selCot.appendChild(o);
+});
+document.getElementById('inp-jornada').value = localStorage.getItem('cte_jornada') || '00';
+document.getElementById('inp-fecha').value = new Date().toISOString().slice(0, 10);
+
+})();
+
+</script>
+  
+<!-- BOTÓN FLOTANTE SOPORTE TÉCNICO -->
+<a class="wa-float" href="https://wa.me/529616868835" target="_blank">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.335-1.524A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.667-.504-5.198-1.385l-.373-.221-3.861.929.972-3.762-.243-.387A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+  💬 Soporte técnico
+</a>
+
+
+</body>
+</html>
