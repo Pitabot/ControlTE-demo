@@ -1573,8 +1573,8 @@ function render() {
         onblur="if(this.value===''||isNaN(this.value)){this.value='';setH(${i},0);}"
         oninput="setH(${i},this.value)">
       <div class="hrs-lbl">horas extra</div>
-      ${d.horas > 0 ? renderSelectorOrden(d, i, 'TE') : ''}
-      ${d.tipo === 'normal' ? renderSelectorOrden(d, i, 'INSALUBRE') : ''}
+      ${(d.horas > 0 || d.ordenTrabajo) ? renderSelectorOrden(d, i, 'TE') : ''}
+      ${(d.tipo === 'normal' || d.ordenInsalubre) ? renderSelectorOrden(d, i, 'INSALUBRE') : ''}
       <div class="type-row">
         <button class="type-btn ${d.tipo==='normal'?'on-n':''}"   onclick="setT(${i},'normal')">Nor</button>
         <button class="type-btn ${d.tipo==='festivo'?'on-f':''}"  onclick="setT(${i},'festivo')">Fes</button>
