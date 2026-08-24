@@ -1506,11 +1506,13 @@ function mostrarPaywall() {
   selPlan('month');
 }
 
-// v13.0: arma el selector de orden de trabajo para un día con horas > 0.
+// v13.1: arma el selector de orden de trabajo para un día con horas > 0.
 // Obligatorio visualmente (borde rojo) si no se ha elegido nada todavía.
+// "Otro" ya no abre campo de texto — solo marca "OTRO" para que se
+// corrija manualmente después, sin riesgo de que el trabajador teclee
+// mal un número de orden real.
 function renderSelectorOrden(d, i) {
   const val = d.ordenTrabajo || '';
-  const esOtro = val.startsWith('OTRO:');
   const vacio = !val;
   const opciones = catalogoOrdenes.map(o => {
     const etiqueta = `${o.orden} — ${(o.descripcion || '').slice(0, 30)}`;
@@ -1518,20 +1520,12 @@ function renderSelectorOrden(d, i) {
     return `<option value="${o.id}" ${sel}>${etiqueta}</option>`;
   }).join('');
 
-  let html = `
+  return `
     <select class="orden-sel ${vacio ? 'orden-req' : ''}" onchange="setOrden(${i}, this.value)">
       <option value="" ${vacio ? 'selected' : ''} disabled>Selecciona orden de trabajo…</option>
       ${opciones}
-      <option value="__OTRO__" ${esOtro ? 'selected' : ''}>Otro…</option>
+      <option value="__OTRO__" ${val === 'OTRO' ? 'selected' : ''}>Otro…</option>
     </select>`;
-
-  if (esOtro) {
-    const texto = val.slice(5); // quita el prefijo 'OTRO:'
-    html += `
-    <input class="orden-otro-inp" type="text" placeholder="Escribe la orden de trabajo"
-      value="${texto}" oninput="setOrdenOtro(${i}, this.value)">`;
-  }
-  return html;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1760,18 +1754,12 @@ async function cargarCatalogoOrdenes() {
 }
 
 function setOrden(i, valor) {
-  const d = semData(semana).dias[i];
-  if (valor === '__OTRO__') {
-    d.ordenTrabajo = 'OTRO:'; // marcador; el texto libre se completa en setOrdenOtro()
-  } else {
-    d.ordenTrabajo = valor; // guarda el id del catálogo directamente
-  }
+  // v13.1: "Otro" ya no abre texto libre — se guarda tal cual como "OTRO"
+  // para que el capturista lo corrija al día siguiente en el Excel, en
+  // vez de arriesgarse a que el trabajador teclee mal el número de orden.
+  semData(semana).dias[i].ordenTrabajo = valor === '__OTRO__' ? 'OTRO' : valor;
   guardar();
   render();
-}
-function setOrdenOtro(i, texto) {
-  semData(semana).dias[i].ordenTrabajo = 'OTRO:' + texto;
-  guardar();
 }
 
 function setH(i, v) {
