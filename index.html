@@ -223,7 +223,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(
 .hrs-lbl { font-size: 9px; color: var(--muted); margin-top: 2px; }
 .orden-sel { width: 100%; font-size: 11px; padding: 4px; margin-top: 6px; border-radius: 6px; border: 1px solid var(--rule); }
 .orden-sel.orden-req { border-color: var(--red, #B52B27); }
-.orden-otro-inp { width: 100%; font-size: 11px; padding: 4px; margin-top: 4px; border-radius: 6px; border: 1px solid var(--rule); }
 .type-row { display: flex; gap: 3px; margin-top: 8px; }
 .type-btn { flex: 1; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 1px; border-radius: 4px; border: 1px solid var(--rule); background: transparent; color: var(--muted); cursor: pointer; transition: all .12s; font-family: 'DM Sans', sans-serif; }
 .type-btn.on-n { background: #e8f0ff; border-color: var(--blue2); color: var(--blue); }
@@ -893,7 +892,7 @@ function semData(s) {
       dias: Array.from({length:7}, (_,i) => {
         const d = new Date(ini); d.setDate(d.getDate()+i);
         const iso = d.toISOString().slice(0,10);
-        return { fecha:iso, horas:0, ordenTrabajo:'', tipo: FEST.has(iso)?'festivo': i>=5?'descanso':'normal' };
+        return { fecha:iso, horas:0, ordenTrabajo:'', ordenInsalubre:'', tipo: FEST.has(iso)?'festivo': i>=5?'descanso':'normal' };
       })
     };
   } else if (datos[k].salSnap === undefined) {
@@ -1511,18 +1510,27 @@ function mostrarPaywall() {
 // "Otro" ya no abre campo de texto — solo marca "OTRO" para que se
 // corrija manualmente después, sin riesgo de que el trabajador teclee
 // mal un número de orden real.
-function renderSelectorOrden(d, i) {
-  const val = d.ordenTrabajo || '';
+// v14.0: ahora filtra el catálogo por tipo (TE vs INSALUBRE) — cada
+// selector solo muestra las órdenes de su categoría. Las órdenes viejas
+// sin campo 'tipo' se tratan como TE (comportamiento antes de v7.0 admin).
+function renderSelectorOrden(d, i, categoria) {
+  const val = categoria === 'INSALUBRE' ? (d.ordenInsalubre || '') : (d.ordenTrabajo || '');
   const vacio = !val;
-  const opciones = catalogoOrdenes.map(o => {
+  const catalogoFiltrado = catalogoOrdenes.filter(o =>
+    categoria === 'INSALUBRE' ? o.tipo === 'INSALUBRE' : o.tipo !== 'INSALUBRE'
+  );
+  const opciones = catalogoFiltrado.map(o => {
     const etiqueta = `${o.orden} — ${(o.descripcion || '').slice(0, 30)}`;
     const sel = val === o.id ? 'selected' : '';
     return `<option value="${o.id}" ${sel}>${etiqueta}</option>`;
   }).join('');
 
+  const funcion = categoria === 'INSALUBRE' ? 'setOrdenInsalubre' : 'setOrden';
+  const placeholder = categoria === 'INSALUBRE' ? 'Orden de trabajo (insalubre)…' : 'Selecciona orden de trabajo…';
+
   return `
-    <select class="orden-sel ${vacio ? 'orden-req' : ''}" onchange="setOrden(${i}, this.value)">
-      <option value="" ${vacio ? 'selected' : ''} disabled>Selecciona orden de trabajo…</option>
+    <select class="orden-sel ${vacio ? 'orden-req' : ''}" onchange="${funcion}(${i}, this.value)">
+      <option value="" ${vacio ? 'selected' : ''} disabled>${placeholder}</option>
       ${opciones}
       <option value="__OTRO__" ${val === 'OTRO' ? 'selected' : ''}>Otro…</option>
     </select>`;
@@ -1557,7 +1565,8 @@ function render() {
         onblur="if(this.value===''||isNaN(this.value)){this.value='';setH(${i},0);}"
         oninput="setH(${i},this.value)">
       <div class="hrs-lbl">horas extra</div>
-      ${d.horas > 0 ? renderSelectorOrden(d, i) : ''}
+      ${d.horas > 0 ? renderSelectorOrden(d, i, 'TE') : ''}
+      ${d.tipo === 'normal' ? renderSelectorOrden(d, i, 'INSALUBRE') : ''}
       <div class="type-row">
         <button class="type-btn ${d.tipo==='normal'?'on-n':''}"   onclick="setT(${i},'normal')">Nor</button>
         <button class="type-btn ${d.tipo==='festivo'?'on-f':''}"  onclick="setT(${i},'festivo')">Fes</button>
@@ -1758,6 +1767,16 @@ function setOrden(i, valor) {
   // para que el capturista lo corrija al día siguiente en el Excel, en
   // vez de arriesgarse a que el trabajador teclee mal el número de orden.
   semData(semana).dias[i].ordenTrabajo = valor === '__OTRO__' ? 'OTRO' : valor;
+  guardar();
+  render();
+}
+
+// v14.0: orden de trabajo para INSALUBRE. Independiente de la de T.E. —
+// se guarda aunque no haya horas extra ese día, mientras sea un día
+// "normal" (no descanso, no festivo). No se reportan horas insalubres en
+// la app, solo la orden — el capturista completa las horas después.
+function setOrdenInsalubre(i, valor) {
+  semData(semana).dias[i].ordenInsalubre = valor === '__OTRO__' ? 'OTRO' : valor;
   guardar();
   render();
 }
