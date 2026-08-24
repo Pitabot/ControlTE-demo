@@ -221,6 +221,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(
 .day-card.festivo .hrs-inp:focus { border-color: var(--gold); }
 .day-card.descanso .hrs-inp:focus { border-color: var(--purple); }
 .hrs-lbl { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.orden-sel { width: 100%; font-size: 11px; padding: 4px; margin-top: 6px; border-radius: 6px; border: 1px solid var(--rule); }
+.orden-sel.orden-req { border-color: var(--red, #B52B27); }
+.orden-otro-inp { width: 100%; font-size: 11px; padding: 4px; margin-top: 4px; border-radius: 6px; border: 1px solid var(--rule); }
 .type-row { display: flex; gap: 3px; margin-top: 8px; }
 .type-btn { flex: 1; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 1px; border-radius: 4px; border: 1px solid var(--rule); background: transparent; color: var(--muted); cursor: pointer; transition: all .12s; font-family: 'DM Sans', sans-serif; }
 .type-btn.on-n { background: #e8f0ff; border-color: var(--blue2); color: var(--blue); }
@@ -412,11 +415,11 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
       <input class="unlock-inp" id="unlock-inp" placeholder="Ingresa tu código" maxlength="12">
     </div>
     <div class="unlock-row" style="margin-top:6px">
+      <input class="unlock-inp" id="unlock-ficha" type="text" inputmode="numeric" placeholder="Tu número de ficha" maxlength="10">
+    </div>
+    <div class="unlock-row" style="margin-top:6px">
       <input class="unlock-inp" id="unlock-tel" type="tel" placeholder="Tu número de teléfono" maxlength="15">
       <button class="unlock-btn" onclick="validarCodigo()">Activar</button>
-    </div>
-    <div style="font-size:10px;color:var(--muted);margin-top:4px">
-      Primera vez: escribe tu número completo. Si cambias de teléfono, solo pide los últimos 4 dígitos.
     </div>
     <div class="unlock-msg" id="unlock-msg"></div>
   </div>
@@ -500,6 +503,7 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
         <select id="sel-jornada" onchange="cambiarJornada();"
           style="flex:1;background:var(--paper);border:1.5px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:var(--ink);cursor:pointer;">
           <option value="00">Jornada 00 — L-V</option>
+          <option value="04">Jornada 04 — Turno discontinuo</option>
           <option value="07">Jornada 07 — 6 días</option>
         </select>
       </div>
@@ -530,7 +534,7 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
           <th>Día</th><th>Horas</th><th>Tolerancia</th>
           <th>1130 T.E. medido</th><th>1140 # Comidas</th><th>Importe comidas</th>
           <th>1180 TE tolerancia</th>
-          <th style="color:#f5c842">1190 T.penado CCT</th>
+          <th style="color:var(--red)">1190 T.penado (recibo)</th>
           <th>Subtotal</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
@@ -593,6 +597,7 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
           <label>Jornada</label>
           <select id="inp-jornada">
             <option value="00">Jornada 00 — Lunes a Viernes</option>
+            <option value="04">Jornada 04 — Turno discontinuo</option>
             <option value="07">Jornada 07 — 6 días</option>
           </select>
         </div>
@@ -668,6 +673,9 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
 
 <div class="footer">
   <b>ControlTE</b> by PitaBot &nbsp;·&nbsp; PEMEX · STPRM · CCT 2025–2027 &nbsp;·&nbsp; Todos los derechos reservados
+  <div style="margin-top:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">
+    controlTEv12_3_1-fixTiempoPenado.html
+  </div>
   <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">
     ID de respaldo: <span id="uid-display">—</span>
     <button onclick="copiarUid()" style="margin-left:6px;font-size:9px;padding:2px 6px;border:1px solid var(--rule);border-radius:4px;background:none;cursor:pointer;color:var(--muted)">Copiar</button>
@@ -758,6 +766,12 @@ async function verificarRevocacion() {
     const snap = await db.collection('cuentas').doc(fbCodigo).get();
     if (!snap.exists) return;
     const cuenta = snap.data();
+    if (cuenta.bloqueado === true) {
+      localStorage.removeItem('cte_lic');
+      alert('Tu acceso a ControlTE fue bloqueado. Contacta a soporte para más información.');
+      location.reload();
+      return;
+    }
     if (cuenta.expira && cuenta.expira <= Date.now()) {
       localStorage.removeItem('cte_lic');
       alert('Tu acceso a ControlTE venció. Contacta a soporte para renovar.');
@@ -772,6 +786,56 @@ function diasRestantes() {
   const lic = getLicencia();
   if (!lic) return 0;
   return Math.max(0, Math.ceil((lic.expira - Date.now()) / 86400000));
+}
+
+// Clientes que ya tenían una licencia local (cte_lic) válida ANTES de esta
+// versión con Firebase nunca pasan por validarCodigo() — licenciaActiva()
+// ya da true con lo que tenían guardado, así que jamás ven el paywall y
+// jamás se les escribe el uid en Firestore. Para ellos, la cuenta queda
+// visible en el panel admin como "Sin activar" aunque sí estén usando la
+// app, y nunca se respalda su historial en la nube.
+//
+// Esta función corre una sola vez al cargar la app: si detecta una
+// licencia local vigente cuyo código nunca fue registrado en Firestore
+// para este dispositivo, lo registra sola, sin pedir teléfono — porque
+// ya demostró ser el dueño legítimo al tener una licencia local vigente
+// para ese código específico (no es un desconocido activando por primera
+// vez, es un cliente conocido "sincronizando" tarde).
+async function intentarAutoRegistro() {
+  const lic = getLicencia();
+  if (!lic || !lic.code || !licenciaActiva()) return false;
+
+  try {
+    const ref = db.collection('cuentas').doc(lic.code);
+    const snap = await ref.get();
+    if (!snap.exists) return false;
+
+    const cuenta = snap.data();
+    const uids = cuenta.uids || [];
+
+    if (uids.includes(fbUid)) {
+      // Este dispositivo ya estaba autorizado (p.ej. tras un
+      // bloqueo/desbloqueo) — solo falta enlazar el código localmente.
+      fbCodigo = lic.code;
+      localStorage.setItem('cte_codigo', lic.code);
+      return true;
+    }
+
+    if (uids.length === 0) {
+      // Primer registro real en Firestore para este código.
+      await ref.update({ uids: [fbUid] });
+      fbCodigo = lic.code;
+      localStorage.setItem('cte_codigo', lic.code);
+      return true;
+    }
+
+    // La cuenta ya tiene dueño(s) registrados y este es un dispositivo
+    // distinto: agregarlo requeriría el teléfono (regla de 2do
+    // dispositivo), así que aquí no se hace nada automático.
+    return false;
+  } catch (e) {
+    return false;
+  }
 }
 
 // Semanas con datos reales (con al menos 1 hora ingresada)
@@ -829,7 +893,7 @@ function semData(s) {
       dias: Array.from({length:7}, (_,i) => {
         const d = new Date(ini); d.setDate(d.getDate()+i);
         const iso = d.toISOString().slice(0,10);
-        return { fecha:iso, horas:0, tipo: FEST.has(iso)?'festivo': i>=5?'descanso':'normal' };
+        return { fecha:iso, horas:0, ordenTrabajo:'', tipo: FEST.has(iso)?'festivo': i>=5?'descanso':'normal' };
       })
     };
   } else if (datos[k].salSnap === undefined) {
@@ -886,7 +950,7 @@ function congelarMontos(s) {
     horasAcum += c.h;
     d.montoSnap = {
       te: c.te, com: c.com, icm: c.icm, tm: c.tm, tet: c.tet,
-      penCCT: c.penCCT, penRecibo: c.penRecibo, primaDom: c.primaDom, sub: c.sub
+      penCCT: c.penCCT, penRecibo: c.penRecibo, primaDom: c.primaDom, sub: c.sub, subRecibo: c.subRecibo
     };
   });
   sd.congelado = Date.now();
@@ -920,11 +984,42 @@ async function guardarSemanaFirestore() {
     await db.collection('cuentas').doc(fbCodigo)
              .collection('semanas').doc('s' + semana)
              .set(sd);
+    // Última actividad: escritura aparte y NO bloqueante — si falla (p.ej.
+    // porque la regla de 'ultimoAcceso' todavía no está publicada en
+    // Firestore), no debe tumbar el guardado real de la semana, que es
+    // lo crítico. El admin usa este campo solo para referencia.
+    db.collection('cuentas').doc(fbCodigo)
+      .update({ ultimoAcceso: Date.now() })
+      .catch(() => {});
     setSyncStatus('ok');
   } catch (e) {
+    // FIX v12.3.2: antes este error se perdía por completo — ni se veía
+    // en consola ni quedaba registro en ningún lado, así que cuando
+    // alguien reportaba "no se guardó mi semana" era imposible saber por
+    // qué sin acceso físico a su celular. Ahora se manda a consola Y se
+    // guarda en la propia cuenta (campo 'ultimoError', no bloqueante,
+    // mismo patrón que 'ultimoAcceso') para poder revisarlo después
+    // directo en Firestore, sin molestar al trabajador.
+    console.error('guardarSemanaFirestore falló:', e.code || '', e.message || e);
+    db.collection('cuentas').doc(fbCodigo)
+      .update({ ultimoError: `${new Date().toISOString()} | ${e.code || ''} ${e.message || e}` })
+      .catch(() => {});
     setSyncStatus('error');
   }
 }
+
+// AUTOGUARDADO PERIÓDICO — igual que el autoguardado de Excel: sin importar
+// si el guardado disparado por edición falló (mala señal, sesión que aún
+// no cargó, etc.), este intervalo reintenta solo cada 5s mientras la
+// pestaña esté abierta. guardarSemanaFirestore() ya es segura de repetir
+// (usa .set(), no crea duplicados), así que no hay riesgo en llamarla
+// de mas — si ya estaba guardado, simplemente vuelve a escribir lo mismo.
+// FIX v12.3.3: bajado de 15s a 5s — algunos trabajadores abren la app,
+// la ven un momento y la cierran antes de los 15s, sin dejar tiempo a
+// que se dispare ni el guardado ni el registro de error si algo falla.
+setInterval(() => {
+  if (fbCodigo && fbUid) guardarSemanaFirestore();
+}, 5000);
 
 // Se dispara si el usuario minimiza/cierra antes de que pase el debounce
 document.addEventListener('visibilitychange', () => {
@@ -962,14 +1057,55 @@ async function restaurarDesdeNube() {
     jornada = perfil.jornada || jornada;
 
     const semanasSnap = await cuentaRef.collection('semanas').get();
-    if (semanasSnap.empty) return false;
+    // FIX v11.1: antes, si la nube no tenía NINGUNA semana todavía (típico
+    // de una cuenta recién re-enlazada por asegurarUidRegistrado(), cuyas
+    // escrituras estuvieron bloqueadas por las reglas hasta ahora), la
+    // función se salía aquí mismo con 'false' — antes de llegar al bloque
+    // de abajo que sube las semanas locales a la nube. Resultado: solo la
+    // semana que la persona tuviera abierta en ese momento terminaba
+    // subiendo (vía el guardado automático normal), y todo su historial
+    // de semanas anteriores se quedaba atrapado únicamente en ese
+    // dispositivo. Quitamos esa salida temprana: aunque la nube esté
+    // vacía, se sigue de largo hasta el bloque de subida, que ya sabe
+    // manejar "esta semana no existe en la nube todavía" perfectamente.
 
-    datos = {};
-    semanasSnap.forEach(d => { datos[d.id] = d.data(); });
+    // FUSIÓN, no reemplazo. Varios dispositivos pueden tener capturas que
+    // el otro no tiene todavía (ej.: laptop desactualizada + celular con
+    // semanas nuevas). Para cada semana, nos quedamos con la version cuyo
+    // 'congelado' (timestamp de ultimo guardado) sea mas reciente. Si una
+    // semana solo existe en un lado (local o nube), esa version se
+    // conserva sin tocar — nunca se borra nada por diferencia de datos.
+    let huboCambiosLocales = false;
+    semanasSnap.forEach(d => {
+      const remota = d.data();
+      const local  = datos[d.id];
+      const remotaTS = remota.congelado || 0;
+      const localTS  = local ? (local.congelado || 0) : -1;
+      if (!local || remotaTS > localTS) {
+        datos[d.id] = remota;
+        huboCambiosLocales = true;
+      }
+    });
 
     localStorage.setItem('cte_v4',      JSON.stringify(datos));
     localStorage.setItem('cte_nivel',   nivel);
     localStorage.setItem('cte_jornada', jornada);
+
+    // Si el local tenia semanas mas nuevas que la nube (ej.: se acaba de
+    // capturar algo con mala señal y no habia subido aun), las subimos
+    // ahora que sí hay conexión, para que el otro dispositivo las reciba
+    // en su proximo restaurarDesdeNube().
+    const semanasRemotasIds = new Set(semanasSnap.docs.map(d => d.id));
+    for (const sID of Object.keys(datos)) {
+      const local = datos[sID];
+      const localTS = local.congelado || 0;
+      const enNube = semanasRemotasIds.has(sID);
+      const remotaTS = enNube ? (semanasSnap.docs.find(d => d.id === sID).data().congelado || 0) : -1;
+      if (!enNube || localTS > remotaTS) {
+        await cuentaRef.collection('semanas').doc(sID).set(local);
+      }
+    }
+
     return true;
   } catch (e) {
     return false;
@@ -999,9 +1135,11 @@ function setSyncStatus(estado) {
 async function validarCodigo() {
   const input = document.getElementById('unlock-inp');
   const telInput = document.getElementById('unlock-tel'); // agregar este campo al HTML del paywall
+  const fichaInput = document.getElementById('unlock-ficha');
   const msg = document.getElementById('unlock-msg');
   const raw = (input.value || '').trim().toUpperCase();
   const tel = (telInput ? telInput.value : '').trim();
+  const ficha = (fichaInput ? fichaInput.value : '').trim();
 
   if (!raw) { msg.innerText = "Escribe un código."; return; }
   if (!tel) { msg.innerText = "Escribe tu número de teléfono."; return; }
@@ -1030,12 +1168,67 @@ async function validarCodigo() {
 
     const cuenta = snap.data();
     const esPrimerCanje = (cuenta.uids || []).length === 0;
+    // Si este dispositivo (fbUid) ya estaba autorizado en la cuenta —caso
+    // típico tras un bloqueo/desbloqueo, donde se borró cte_lic pero el
+    // UID de Firebase Auth sigue siendo el mismo—, NO se debe escribir
+    // nada en Firestore: no es un dispositivo nuevo, es el mismo de
+    // siempre reconectando. Escribir aquí chocaría contra el límite de 2
+    // dispositivos si la cuenta ya tiene 2 uids registrados.
+    const yaAutorizado = (cuenta.uids || []).includes(fbUid);
 
-    if (esPrimerCanje) {
+    // FIX v10.2: el plan (semana/mes/año) debe empezar a contar desde que
+    // el trabajador realmente activa el código por primera vez, no desde
+    // que se generó/migró. Antes, un código sin usar por más tiempo del
+    // que dura su plan ya traía un 'expira' vencido desde antes de
+    // activarse, y el usuario era expulsado segundos después de entrar.
+    // Por eso 'expiraFinal' se recalcula SOLO en primer canje; en los
+    // demás casos (dispositivo ya conocido) se respeta el expira real que
+    // ya trae la cuenta, sin tocarlo.
+    let diasPlan = cuenta.plan === 'week' ? 7 : (cuenta.plan === 'month' ? 30 : 365);
+    let expiraFinal = cuenta.expira;
+
+    if (yaAutorizado) {
+      // No hay nada que actualizar en Firestore — solo se restablece la
+      // licencia local abajo, con los datos que ya existen en la cuenta.
+    } else if (esPrimerCanje) {
+      // Primer canje: en vez de dejar que el trabajador escriba su nombre
+      // libremente, se identifica por ficha contra el escalafón precargado
+      // (colección 'escalafon', ficha -> nombre, cargada una sola vez vía
+      // Admin SDK). Si la ficha existe ahí, se confirma una sola vez con
+      // Sí/No antes de ligarla a la cuenta — así el nombre y la ficha que
+      // quedan guardados son siempre los reales del escalafón, nunca un
+      // texto libre mal escrito.
+      if (!ficha) {
+        msg.className = "unlock-msg err";
+        msg.innerText = "Escribe tu número de ficha.";
+        return;
+      }
+
+      const escalafonSnap = await db.collection('escalafon').doc(ficha).get();
+      if (!escalafonSnap.exists) {
+        msg.className = "unlock-msg err";
+        msg.innerText = "Verifica tu ficha e intenta de nuevo.";
+        return;
+      }
+
+      const nombreEscalafon = escalafonSnap.data().nombre;
+      const confirmado = window.confirm(`¿Eres ${nombreEscalafon}?`);
+      if (!confirmado) {
+        fichaInput.value = '';
+        msg.className = "unlock-msg err";
+        msg.innerText = "Verifica tu ficha e intenta de nuevo.";
+        return;
+      }
+
+      expiraFinal = Date.now() + diasPlan * 24 * 60 * 60 * 1000;
+
       await ref.update({
-        uids: firebase.firestore.FieldValue.arrayUnion(fbUid),
+        uids: [fbUid],
         telHash:  hashSimple(tel),
-        tel4Hash: hashSimple(tel.slice(-4))
+        tel4Hash: hashSimple(tel.slice(-4)),
+        ficha: ficha,
+        nombre: nombreEscalafon,
+        expira: expiraFinal
       });
     } else {
       // Dispositivo nuevo: el campo tel4 del input se compara contra
@@ -1049,11 +1242,10 @@ async function validarCodigo() {
     fbCodigo = raw;
     localStorage.setItem('cte_codigo', raw);
 
-    let dias = cuenta.plan === 'week' ? 7 : (cuenta.plan === 'month' ? 30 : 365);
     setLicencia({
       code: raw,
       activado: Date.now(),
-      expira: cuenta.expira || (Date.now() + dias * 24 * 60 * 60 * 1000)
+      expira: expiraFinal || (Date.now() + diasPlan * 24 * 60 * 60 * 1000)
     });
 
     msg.className = "unlock-msg ok";
@@ -1069,29 +1261,90 @@ async function validarCodigo() {
   }
 }
 
+// FIX v11.0: clientes viejos cuyo navegador ya tenía 'cte_codigo' guardado
+// en localStorage desde antes de que la app usara Firestore nunca pasan
+// por intentarAutoRegistro() (esa función solo corre si NO hay código
+// local) — su cuenta se queda con uids:[] para siempre. La app les sigue
+// funcionando porque su licencia local (cte_lic) sigue vigente, pero
+// nunca suben nada a la nube, nunca actualizan ultimoAcceso, y nunca
+// aparecen con actividad en el panel admin, aunque sí estén usando la app
+// a diario. Esta función corre SIEMPRE que ya hay un código local, y
+// enlaza el dispositivo si Firestore todavía no lo tiene registrado.
+async function asegurarUidRegistrado(codigo) {
+  if (!fbUid || !codigo) return;
+  try {
+    const ref = db.collection('cuentas').doc(codigo);
+    const snap = await ref.get();
+    if (!snap.exists) return;
+    const uids = snap.data().uids || [];
+    if (uids.includes(fbUid)) return; // ya registrado, nada que hacer
+
+    if (uids.length === 0) {
+      // Nadie ha reclamado esta cuenta en Firestore todavía: este
+      // dispositivo, al tener ya una licencia local vigente para este
+      // código, se registra solo — mismo criterio que intentarAutoRegistro().
+      await ref.update({ uids: [fbUid] });
+    }
+    // Si uids.length > 0 y este uid no está ahí, es un dispositivo
+    // distinto al ya registrado — no se toca nada aquí (eso requiere el
+    // flujo de "dispositivo nuevo" con teléfono, vía validarCodigo()).
+  } catch (e) {
+    // Sin conexión u otro fallo: se reintenta solo en la próxima carga.
+  }
+}
+
 async function initApp() {
   const splash = document.getElementById('splash');
 
   // PRIMER PASO SIEMPRE: autenticar con Firebase. Sin esto, ninguna
   // lectura/escritura a Firestore va a funcionar (las reglas exigen
   // request.auth != null en todos los casos).
+  // Si el navegador ya tiene una sesion anonima guardada (auth.currentUser),
+  // la reutilizamos en vez de crear una nueva cada vez que se carga la
+  // pagina — crear una nueva pisaba el uid ya sellado en uids[] y dejaba
+  // a la app sin permisos aunque el login original hubiera sido correcto.
   try {
-    const cred = await auth.signInAnonymously();
-    fbUid = cred.user.uid;
+    if (auth.currentUser) {
+      fbUid = auth.currentUser.uid;
+    } else {
+      const cred = await auth.signInAnonymously();
+      fbUid = cred.user.uid;
+    }
   } catch (e) {
     fbUid = null;
   }
 
   fbCodigo = localStorage.getItem('cte_codigo') || null;
 
-  const sinDatosLocales = Object.keys(datos).length === 0;
-  if (sinDatosLocales && fbCodigo) {
-    // Ya hay codigo conocido de una sesion anterior: intenta restaurar
+  // v13.0: catálogo de órdenes de trabajo — se carga una sola vez al
+  // iniciar, sin importar si hay sesión o no (es lectura pública para
+  // cualquier usuario autenticado). Si falla (sin señal, etc.), la app
+  // sigue funcionando normal, solo que el selector queda vacío y cae en
+  // "Otro" — no debe tumbar el arranque de la app.
+  cargarCatalogoOrdenes().catch(() => {});
+
+  // Cliente con licencia local vieja (previa a esta versión), sin
+  // registro en Firestore: intenta registrarlo solo, sin pedirle nada.
+  if (!fbCodigo) {
+    await intentarAutoRegistro();
+  } else {
+    // FIX v11.0: aunque ya haya código local guardado, confirma que este
+    // dispositivo esté realmente enlazado en Firestore (ver asegurarUidRegistrado).
+    await asegurarUidRegistrado(fbCodigo);
+  }
+
+  // Siempre fusiona con la nube al arrancar, sin importar si ya habia
+  // datos locales. restaurarDesdeNube() ahora hace merge semana por
+  // semana (no reemplaza todo), asi que es seguro llamarla siempre:
+  // si el local esta mas actualizado que la nube en alguna semana, esa
+  // version local se conserva y ademas se sube; si la nube tiene algo
+  // que el local no tiene, se agrega. Antes, un dispositivo con datos
+  // locales viejos nunca volvia a consultar la nube, y podia terminar
+  // pisando semanas que otro dispositivo ya habia respaldado.
+  if (fbCodigo) {
     const restaurado = await restaurarDesdeNube();
     if (restaurado) cambiarSemana(0);
-  } else if (!sinDatosLocales && fbCodigo) {
-    // Ya hay datos y sesion: sube un respaldo silencioso de la semana actual
-    guardarSemanaFirestoreDebounced();
+    else guardarSemanaFirestoreDebounced();
   }
 
   if (splash) {
@@ -1122,14 +1375,7 @@ function contactarWA() {
   window.open(`https://wa.me/${WA_NUM}?text=Hola, soy ${nombre}. Quiero activar ControlTE.`, '_blank');
 }
 
-function showTab(id) {
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  if(event) event.currentTarget.classList.add('active');
-}
-
-window.onload = () => { /* El splash se maneja con el botón */ };
+window.onload = () => { initApp(); };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // CÁLCULOS CCT 2025-2027 (VERSIÓN FINAL UNIFICADA)
@@ -1153,8 +1399,8 @@ function getComidas(horas, tipo) {
     return 0;
   }
 
-  if (j === '07') {
-    // Jornada 07: 2h=1 comida, 8h+=2 comidas
+  if (j === '07' || j === '04') {
+    // Jornada 07 y 04: 2h=1 comida, 8h+=2 comidas (04 se trata igual que 07)
     if (horas >= 8) return 2;
     if (horas >= 2) return 1;
     return 0;
@@ -1186,11 +1432,15 @@ function calcDia(d, horasPrevias, salSnap, arcSnap) {
   const minTol = getTolMin(h, t);
   const tet = Math.round(((minTol / 60) * valorHoraExtra) * 100) / 100;
 
-  // --- 1190: TIEMPO PENADO (desde la hora 13 acumulada en la semana) ---
+  // --- 1190: TIEMPO PENADO ---
+  // CCT Cláusula 193 (texto: "a partir de la 13ª hora... por cada semana"): acumulado SEMANAL desde hora 13.
+  // Fórmula empresa (recibo), según Piver: acumulado SEMANAL, DESPUÉS de 17 horas acumuladas
+  // (la hora 17 no cuenta, la hora 18 es la primera penada). Tasa sal÷8 únicamente.
   const horasAnteriores = horasPrevias || 0;
   const horasDesde13    = Math.max(0, (horasAnteriores + h) - 12) - Math.max(0, horasAnteriores - 12);
+  const horasDesde17    = Math.max(0, (horasAnteriores + h) - 17) - Math.max(0, horasAnteriores - 17);
   const penCCT    = Math.round((horasDesde13 * ((salTab / 8) + valorHoraExtra)) * 100) / 100;
-  const penRecibo = Math.round((horasDesde13 * (salTab / 8))                    * 100) / 100;
+  const penRecibo = Math.round((horasDesde17 * (salTab / 8))                    * 100) / 100;
 
   // --- PRIMA DOMINICAL (35%) ---
   let primaDom = 0;
@@ -1203,9 +1453,10 @@ function calcDia(d, horasPrevias, salSnap, arcSnap) {
   const com = getComidas(h, t);
   const icm = Math.round((com * 187.75) * 100) / 100;
 
-  const subTotal = Math.round((te + icm + tet + penCCT + primaDom) * 100) / 100;
+  const subTotal       = Math.round((te + icm + tet + penCCT    + primaDom) * 100) / 100;
+  const subTotalRecibo = Math.round((te + icm + tet + penRecibo + primaDom) * 100) / 100;
 
-  return { h, t, te, com, icm, tm: minTol, tet, penCCT, penRecibo, primaDom, sub: h > 0 ? subTotal : 0 };
+  return { h, t, te, com, icm, tm: minTol, tet, penCCT, penRecibo, primaDom, sub: h > 0 ? subTotal : 0, subRecibo: h > 0 ? subTotalRecibo : 0 };
 }
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FORMATO
@@ -1255,6 +1506,34 @@ function mostrarPaywall() {
   selPlan('month');
 }
 
+// v13.0: arma el selector de orden de trabajo para un día con horas > 0.
+// Obligatorio visualmente (borde rojo) si no se ha elegido nada todavía.
+function renderSelectorOrden(d, i) {
+  const val = d.ordenTrabajo || '';
+  const esOtro = val.startsWith('OTRO:');
+  const vacio = !val;
+  const opciones = catalogoOrdenes.map(o => {
+    const etiqueta = `${o.orden} — ${(o.descripcion || '').slice(0, 30)}`;
+    const sel = val === o.id ? 'selected' : '';
+    return `<option value="${o.id}" ${sel}>${etiqueta}</option>`;
+  }).join('');
+
+  let html = `
+    <select class="orden-sel ${vacio ? 'orden-req' : ''}" onchange="setOrden(${i}, this.value)">
+      <option value="" ${vacio ? 'selected' : ''} disabled>Selecciona orden de trabajo…</option>
+      ${opciones}
+      <option value="__OTRO__" ${esOtro ? 'selected' : ''}>Otro…</option>
+    </select>`;
+
+  if (esOtro) {
+    const texto = val.slice(5); // quita el prefijo 'OTRO:'
+    html += `
+    <input class="orden-otro-inp" type="text" placeholder="Escribe la orden de trabajo"
+      value="${texto}" oninput="setOrdenOtro(${i}, this.value)">`;
+  }
+  return html;
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // RENDER PRINCIPAL
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1284,6 +1563,7 @@ function render() {
         onblur="if(this.value===''||isNaN(this.value)){this.value='';setH(${i},0);}"
         oninput="setH(${i},this.value)">
       <div class="hrs-lbl">horas extra</div>
+      ${d.horas > 0 ? renderSelectorOrden(d, i) : ''}
       <div class="type-row">
         <button class="type-btn ${d.tipo==='normal'?'on-n':''}"   onclick="setT(${i},'normal')">Nor</button>
         <button class="type-btn ${d.tipo==='festivo'?'on-f':''}"  onclick="setT(${i},'festivo')">Fes</button>
@@ -1295,7 +1575,7 @@ function render() {
   // TABLA
   const tb = document.getElementById('tbody');
   tb.innerHTML = '';
-  let tH=0,tTE=0,tC=0,tIC=0,tTM=0,tTET=0,tPcct=0,tS=0;
+  let tH=0,tTE=0,tC=0,tIC=0,tTM=0,tTET=0,tPcct=0,tPrec=0,tS=0,tSrec=0;
   let horasAcum = 0;
 
   sd.dias.forEach((d, i) => {
@@ -1313,11 +1593,14 @@ function render() {
       <td>${c.com || '<span class="z">—</span>'}</td>
       <td>${f$(c.icm)}</td>
       <td>${f$(c.tet)}</td>
-      <td style="color:var(--gold)">${f$(c.penCCT)}</td>
-      <td>${c.h > 0 ? f$(c.sub) : '<span class="z">—</span>'}</td>`;
+      <td>
+        <div style="color:var(--red);font-weight:700">${f$(c.penRecibo)}</div>
+        <div style="font-size:10px;color:var(--gold);margin-top:2px">CCT: ${f$(c.penCCT)}</div>
+      </td>
+      <td>${c.h > 0 ? f$(c.subRecibo) : '<span class="z">—</span>'}</td>`;
     tb.appendChild(tr);
     tH+=c.h; tTE+=c.te; tC+=c.com; tIC+=c.icm; tTM+=c.tm; tTET+=c.tet;
-    tPcct+=c.penCCT; tS+=c.sub;
+    tPcct+=c.penCCT; tPrec+=c.penRecibo; tS+=c.sub; tSrec+=c.subRecibo;
   });
 
   const totHHMM = fTol(tTM);
@@ -1327,12 +1610,15 @@ function render() {
     <td>${totHHMM ? `<b>${totHHMM}</b><span class="tol-min">${tTM} min</span>` : '<span class="z">—</span>'}</td>
     <td>${f$(tTE)}</td><td>${tC||'<span class="z">—</span>'}</td>
     <td>${f$(tIC)}</td><td>${f$(tTET)}</td>
-    <td style="color:var(--gold)">${f$(tPcct)}</td>
-    <td>${f$(tS)}</td>`;
+    <td>
+      <div style="color:var(--red);font-weight:700">${f$(tPrec)}</div>
+      <div style="font-size:10px;color:var(--gold);margin-top:2px">CCT: ${f$(tPcct)}</div>
+    </td>
+    <td>${f$(tSrec)}</td>`;
   tb.appendChild(trT);
 
   const trG = document.createElement('tr'); trG.className = 'grow';
-  trG.innerHTML = `<td colspan="8" style="text-align:left;color:rgba(255,255,255,.7)">IMPORTE TOTAL A COBRAR &nbsp;(1130 + 1140 + 1180 + 1190 CCT)</td><td>${f$(tS)}</td>`;
+  trG.innerHTML = `<td colspan="8" style="text-align:left;color:rgba(255,255,255,.7)">IMPORTE TOTAL A COBRAR &nbsp;(1130 + 1140 + 1180 + 1190 recibo)</td><td>${f$(tSrec)}</td>`;
   tb.appendChild(trG);
 
   // CARDS
@@ -1341,8 +1627,8 @@ function render() {
     <div class="scard"><div class="scard-lbl">Tolerancia total</div><div class="scard-val" style="font-size:16px">${totHHMM||'—'}<span class="scard-unit">h:mm</span></div></div>
     <div class="scard" style="border-color:var(--gold);background:#fffbf0"><div class="scard-lbl" style="color:var(--gold)">🍽 Comidas semana</div><div class="scard-val" style="color:var(--gold)">${tC}<span class="scard-unit">comidas</span></div><div style="font-size:10px;color:var(--red);font-weight:700;margin-top:4px">$${tIC.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
     <div class="scard"><div class="scard-lbl">T.E. medido 1130</div><div class="scard-val" style="font-size:15px">$${tTE.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
-    <div class="scard" style="border-color:var(--gold)"><div class="scard-lbl" style="color:var(--gold)">1190 T.penado CCT</div><div class="scard-val" style="font-size:15px;color:var(--gold)">$${tPcct.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
-    <div class="scard hl"><div class="scard-lbl">Total a cobrar (CCT)</div><div class="scard-val">$${tS.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>`;
+    <div class="scard" style="border-color:var(--red)"><div class="scard-lbl" style="color:var(--red)">1190 T.penado (recibo)</div><div class="scard-val" style="font-size:15px;color:var(--red)">$${tPrec.toLocaleString('es-MX',{minimumFractionDigits:2})}</div><div style="font-size:10px;color:var(--gold);margin-top:4px">CCT: $${tPcct.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
+    <div class="scard hl"><div class="scard-lbl">Total a cobrar (recibo)</div><div class="scard-val">$${tSrec.toLocaleString('es-MX',{minimumFractionDigits:2})}</div><div style="font-size:10px;color:var(--gold);margin-top:4px">CCT: $${tS.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>`;
 
   guardar();
   renderHist();
@@ -1363,10 +1649,15 @@ function renderHist() {
     return;
   }
   sems.forEach(s => {
-    const sd = datos['s'+s]; let tH=0, tS=0;
+    const sd = datos['s'+s]; let tH=0, tS=0, tSrec=0;
     sd.dias.forEach(d => {
-      if (d.montoSnap) { tH += d.horas||0; tS += d.montoSnap.sub; }
-      else { const c=calcDia(d,0,sd.salSnap,sd.arcSnap); tH+=c.h; tS+=c.sub; }
+      if (d.montoSnap) {
+        tH += d.horas||0; tS += d.montoSnap.sub;
+        tSrec += (d.montoSnap.subRecibo !== undefined)
+          ? d.montoSnap.subRecibo
+          : (d.montoSnap.te + d.montoSnap.icm + d.montoSnap.tet + d.montoSnap.penRecibo + d.montoSnap.primaDom);
+      }
+      else { const c=calcDia(d,0,sd.salSnap,sd.arcSnap); tH+=c.h; tS+=c.sub; tSrec+=c.subRecibo; }
     });
     if (tH === 0 && !sd.pagado) return;
 
@@ -1393,7 +1684,8 @@ function renderHist() {
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-        <div class="htot">$${tS.toLocaleString('es-MX',{minimumFractionDigits:2})}</div>
+        <div class="htot" style="color:var(--red)">$${tSrec.toLocaleString('es-MX',{minimumFractionDigits:2})}</div>
+        <div style="font-size:9px;color:var(--gold)">CCT: $${tS.toLocaleString('es-MX',{minimumFractionDigits:2})}</div>
         <div class="hbdg ${sd.pagado?'pg':'pe'}">${sd.pagado?'Pagado':'Pendiente'}</div>
       </div>`;
     el.querySelector('div').addEventListener('click', (e) => {
@@ -1428,13 +1720,13 @@ function renderRef() {
 
   // Comidas según jornada activa
   const TASA_COMIDA = 187.75;
-  if (j === '07') {
+  if (j === '07' || j === '04') {
     document.getElementById('ref-com').innerHTML = `
-      <div class="rbox-hd" style="background:#fff3d0;color:var(--gold);font-size:10px;padding:6px 14px;border-bottom:1px solid var(--rule);">Jornada 07 — Día normal</div>
+      <div class="rbox-hd" style="background:#fff3d0;color:var(--gold);font-size:10px;padding:6px 14px;border-bottom:1px solid var(--rule);">Jornada 04/07 — Día normal</div>
       <div class="rrow na"><span>Menos de 2 hrs</span><span>Sin comida</span></div>
       <div class="rrow"><span>2 a 7 hrs</span><span>1 comida ($${(1*TASA_COMIDA).toFixed(2)})</span></div>
       <div class="rrow"><span>8 hrs o más</span><span>2 comidas ($${(2*TASA_COMIDA).toFixed(2)})</span></div>
-      <div class="rbox-hd" style="background:#f0e8ff;color:var(--purple);font-size:10px;padding:6px 14px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);">Jornada 07 — Festivo / Descanso</div>
+      <div class="rbox-hd" style="background:#f0e8ff;color:var(--purple);font-size:10px;padding:6px 14px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);">Jornada 04/07 — Festivo / Descanso</div>
       <div class="rrow na"><span>Menos de 2 hrs</span><span>Sin comida</span></div>
       <div class="rrow"><span>2 a 11 hrs</span><span>1 comida ($${(1*TASA_COMIDA).toFixed(2)})</span></div>
       <div class="rrow"><span>12 hrs o más</span><span>2 comidas ($${(2*TASA_COMIDA).toFixed(2)})</span></div>
@@ -1457,6 +1749,31 @@ function renderRef() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // CONTROLES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// v13.0: CATÁLOGO DE ÓRDENES DE TRABAJO
+// Se carga una vez y se guarda en memoria (catalogoOrdenes). El admin lo
+// alimenta desde el Panel Admin — la app aquí solo lee.
+let catalogoOrdenes = [];
+async function cargarCatalogoOrdenes() {
+  const snap = await db.collection('ordenesTrabajo').orderBy('creadoEn', 'desc').get();
+  catalogoOrdenes = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  render(); // refresca los selectores ya en pantalla con la lista recién cargada
+}
+
+function setOrden(i, valor) {
+  const d = semData(semana).dias[i];
+  if (valor === '__OTRO__') {
+    d.ordenTrabajo = 'OTRO:'; // marcador; el texto libre se completa en setOrdenOtro()
+  } else {
+    d.ordenTrabajo = valor; // guarda el id del catálogo directamente
+  }
+  guardar();
+  render();
+}
+function setOrdenOtro(i, texto) {
+  semData(semana).dias[i].ordenTrabajo = 'OTRO:' + texto;
+  guardar();
+}
+
 function setH(i, v) {
   const nuevas_horas = Math.max(0, parseInt(v) || 0);
   if (nuevas_horas > 0 && !puedeUsarSemana(semana)) {
@@ -1611,15 +1928,16 @@ function calcDiaHistorialCot(d, horasAcum, salSnap, arcSnap, jornadaSnap) {
   let com = 0;
   if (t === 'festivo' || t === 'descanso') {
     if (h >= 12) com = 2; else if (h >= 2) com = 1;
-  } else if (jornadaSnap === '07') {
+  } else if (jornadaSnap === '07' || jornadaSnap === '04') {
     if (h >= 8) com = 2; else if (h >= 2) com = 1;
   } else {
     if (h >= 5) com = 2; else if (h >= 2) com = 1;
   }
   const icm = Math.round((com * TASA_COMIDA) * 100) / 100;
   const horasDesde13 = Math.max(0, (horasAcum + h) - 12) - Math.max(0, horasAcum - 12);
+  const horasDesde17 = Math.max(0, (horasAcum + h) - 17) - Math.max(0, horasAcum - 17);
   const penCCT    = Math.round((horasDesde13 * ((sal / 8) + valorHoraExtra)) * 100) / 100;
-  const penRecibo = Math.round((horasDesde13 * (sal / 8)) * 100) / 100;
+  const penRecibo = Math.round((horasDesde17 * (sal / 8)) * 100) / 100;
   return { h, t, te, com, icm, minTol, tet, penCCT, penRecibo };
 }
 
