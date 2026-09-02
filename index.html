@@ -226,6 +226,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(
 .orden-fila { display: flex; align-items: center; gap: 4px; }
 .orden-fila .orden-sel { margin-top: 6px; flex: 1; }
 .orden-borrar { margin-top: 6px; width: 22px; height: 26px; border: 1px solid var(--rule); border-radius: 6px; background: white; color: var(--red, #B52B27); font-size: 14px; line-height: 1; cursor: pointer; }
+.orden-fija { margin-top: 6px; font-size: 11px; padding: 5px 8px; border-radius: 6px; background: #eef4ff; border: 1px solid var(--blue2); color: var(--blue); }
+.orden-aviso { margin-top: 6px; font-size: 10px; padding: 5px 8px; border-radius: 6px; background: #fff3f2; border: 1px dashed var(--red, #B52B27); color: var(--red, #B52B27); }
 .type-row { display: flex; gap: 3px; margin-top: 8px; }
 .type-btn { flex: 1; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 1px; border-radius: 4px; border: 1px solid var(--rule); background: transparent; color: var(--muted); cursor: pointer; transition: all .12s; font-family: 'DM Sans', sans-serif; }
 .type-btn.on-n { background: #e8f0ff; border-color: var(--blue2); color: var(--blue); }
@@ -384,6 +386,38 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
 .badge-match.err { background: rgba(181,43,39,.12); color: #b52b27; }
 .no-historial { padding: 20px; text-align: center; font-size: 12px; color: var(--mid); }
 .tol-note { background: var(--rule); border-radius: 7px; padding: 10px 14px; font-size: 11px; color: var(--mid); line-height: 1.6; margin-top: 14px; }
+/* v17.0: plan FREE — oculta todo lo marcado .solo-pago cuando body
+   trae la clase .plan-free. Esto es solo cosmético (la barrera real
+   vive en firestore-v5.rules, que niega LECTURA de /semanas para
+   cuentas free); aquí solo evitamos que un free vea en pantalla algo
+   que de todos modos no podría leer de vuelta. */
+body.plan-free .solo-pago { display: none !important; }
+
+.free-modal-overlay {
+  position: fixed; inset: 0; background: rgba(20,20,30,.55);
+  display: none; align-items: center; justify-content: center;
+  z-index: 9999; padding: 20px;
+}
+.free-modal-overlay.show { display: flex; }
+.free-modal-card {
+  background: var(--white); border-radius: 14px; max-width: 420px;
+  width: 100%; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  position: relative;
+}
+.free-modal-close {
+  position: absolute; top: 10px; right: 10px; border: none;
+  background: var(--rule); color: var(--ink); font-weight: 700;
+  font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+}
+.free-modal-title { font-size: 17px; font-weight: 700; margin: 6px 30px 10px 0; }
+.free-modal-body { font-size: 13px; line-height: 1.55; color: var(--mid); }
+.free-modal-body ul { margin: 8px 0; padding-left: 18px; }
+.free-modal-body li { margin-bottom: 4px; }
+.free-modal-wa {
+  display: block; text-align: center; margin-top: 16px; padding: 10px;
+  background: var(--blue); color: #fff; border-radius: 8px;
+  text-decoration: none; font-weight: 700; font-size: 13px;
+}
 </style>
 </head>
 <body>
@@ -447,8 +481,8 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
     </div>
   </div>
   <div class="header-right">
-    <div class="chip">Salario: <b id="chip-sal">—</b></div>
-    <div class="chip">Hora TE: <b id="chip-hora">—</b></div>
+    <div class="chip solo-pago">Salario: <b id="chip-sal">—</b></div>
+    <div class="chip solo-pago">Hora TE: <b id="chip-hora">—</b></div>
     <span id="sync-status" style="font-size:10px;color:var(--muted,#888);margin-right:6px;"></span>
     <div class="status-badge" onclick="verEstado()" id="status-badge">
       <div class="status-dot free" id="status-dot"></div>
@@ -460,9 +494,9 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
 <!-- ═══ TABS ═══ -->
 <div class="tabs-bar">
   <div class="tab-btn active" onclick="showTab('captura')">📋 Captura</div>
-  <div class="tab-btn" onclick="showTab('historial')">📊 Historial</div>
-  <div class="tab-btn" onclick="showTab('cotejador')">🔍 Cotejador</div>
-  <div class="tab-btn" onclick="showTab('referencia')">📖 Referencia</div>
+  <div class="tab-btn solo-pago" onclick="showTab('historial')">📊 Historial</div>
+  <div class="tab-btn solo-pago" onclick="showTab('cotejador')">🔍 Cotejador</div>
+  <div class="tab-btn solo-pago" onclick="showTab('referencia')">📖 Referencia</div>
   <div class="tab-btn" onclick="showTab('soporte')">💬 Soporte</div>
 </div>
 
@@ -471,8 +505,8 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
   <!-- ═══ CAPTURA ═══ -->
   <div id="tab-captura" class="tab-pane active">
 
-    <!-- Barra semanas gratuitas -->
-    <div class="free-bar" id="free-bar">
+    <!-- Barra semanas gratuitas (legado, previo al sistema de códigos) -->
+    <div class="free-bar solo-pago" id="free-bar">
       <div class="free-bar-txt">
         <b id="free-txt">Semanas usadas: 0 / 2</b><br>
         <span id="free-sub">Tienes 2 semanas gratuitas disponibles</span>
@@ -483,7 +517,7 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
       </div>
     </div>
 
-    <div class="notice">
+    <div class="notice solo-pago">
       ⚠️ <strong>Festivo (CCT Cl. 139):</strong> Sin tolerancia antes de 12h · Comidas desde 12h &nbsp;|&nbsp;
       <strong>Descanso semanal:</strong> Tolerancia desde 4h · Comidas desde 12h
     </div>
@@ -494,7 +528,7 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
         <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mid);">Trabajador</span>
         <input id="inp-nombre2" style="flex:1;background:var(--paper);border:1.5px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:var(--ink);" value="" placeholder="Nombre del trabajador" oninput="document.getElementById('inp-nombre').value=this.value;guardar()">
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex:2;min-width:200px;">
+      <div class="solo-pago" style="display:flex;align-items:center;gap:8px;flex:2;min-width:200px;">
         <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mid);white-space:nowrap;">Nivel</span>
         <select id="sel-nivel2" onchange="document.getElementById('sel-nivel').value=this.value;cambiarNivel();"
           style="flex:1;background:var(--paper);border:1.5px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:var(--ink);cursor:pointer;">
@@ -509,7 +543,7 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
           <option value="07">Jornada 07 — 6 días</option>
         </select>
       </div>
-      <div style="background:var(--blue);border-radius:8px;padding:8px 14px;text-align:center;min-width:120px;">
+      <div class="solo-pago" style="background:var(--blue);border-radius:8px;padding:8px 14px;text-align:center;min-width:120px;">
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.6);">Salario diario</div>
         <div id="sal-visible" style="font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:#7dd3fc;margin-top:2px;">$276.08</div>
       </div>
@@ -522,15 +556,15 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
         <div class="week-rng" id="wrng"></div>
       </div>
       <button class="nav-btn" onclick="cambiarSemana(1)">Siguiente →</button>
-      <button class="nav-btn" id="btn-pag" onclick="marcarPagado()">✓ Marcar pagado</button>
+      <button class="nav-btn solo-pago" id="btn-pag" onclick="marcarPagado()">✓ Marcar pagado</button>
     </div>
 
     <div class="sec-lbl">Días de la semana</div>
     <div class="days-grid" id="days-grid"></div>
     <div class="scards" id="scards"></div>
 
-    <div class="sec-lbl">Desglose por concepto de nómina</div>
-    <div class="tbl-wrap">
+    <div class="sec-lbl solo-pago">Desglose por concepto de nómina</div>
+    <div class="tbl-wrap solo-pago">
       <table>
         <thead><tr>
           <th>Día</th><th>Horas</th><th>Tolerancia</th>
@@ -673,10 +707,33 @@ tr.grow td:last-child { color: #7dd3fc; font-size: 15px; }
 
 </div>
 
+<!-- ═══ MODAL LÍMITES/BENEFICIOS — solo plan free, 1 vez al día ═══ -->
+<div class="free-modal-overlay" id="free-modal">
+  <div class="free-modal-card">
+    <button class="free-modal-close" onclick="cerrarModalFree()">Cerrar</button>
+    <div class="free-modal-title">Estás usando ControlTE gratis</div>
+    <div class="free-modal-body">
+      Con tu acceso actual solo puedes:
+      <ul>
+        <li>Registrar tus horas de T.E. e insalubre</li>
+        <li>Asignarles una orden de trabajo</li>
+      </ul>
+      Con la versión de paga, además obtienes:
+      <ul>
+        <li>Tolerancia, comidas y tiempo penado calculados automáticamente</li>
+        <li>Historial completo de tus semanas</li>
+        <li>Cotejador de recibos de nómina</li>
+        <li>Referencia de tasas y cláusulas del CCT</li>
+      </ul>
+      <a class="free-modal-wa" href="https://wa.me/529616868835?text=Hola, quiero activar mi acceso de paga a ControlTE." target="_blank">💬 Activar versión de paga</a>
+    </div>
+  </div>
+</div>
+
 <div class="footer">
   <b>ControlTE</b> by PitaBot &nbsp;·&nbsp; PEMEX · STPRM · CCT 2025–2027 &nbsp;·&nbsp; Todos los derechos reservados
   <div style="margin-top:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">
-    controlTEv12_3_1-fixTiempoPenado.html
+    <span id="footer-version">—</span>
   </div>
   <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">
     ID de respaldo: <span id="uid-display">—</span>
@@ -739,6 +796,16 @@ const FEST = new Set([
   '2026-10-12','2026-11-01','2026-11-02',
   '2026-11-16','2026-12-25'
 ]);
+// v16.0: ÚNICO lugar donde vive el nombre de versión — el footer lo lee
+// de aquí. Cambia SOLO esta línea al subir una versión nueva y el footer
+// queda correcto automáticamente (antes se escribía aparte y se
+// desincronizaba: el footer decía v12.3.1 cuando el archivo ya era v15.0).
+const VERSION_ARCHIVO = 'controlTEv17_0-planFree.html';
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('footer-version');
+  if (el) el.textContent = VERSION_ARCHIVO;
+});
+
 const DNOM = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const WA_NUM = '529616868835';
 
@@ -912,23 +979,58 @@ function semData(s) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FIREBASE — reemplaza JSONBin por completo.
 // firebaseConfig NO es secreto (identifica el proyecto, no da permisos).
-// La seguridad real vive en firestore.rules, ya desplegado en controlte-prod.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// La seguridad real vive en firestore.rules, ya desplegado en controlte-pro
 const firebaseConfig = {
-  apiKey: "AIzaSyCVvu-yF6a67nKPyVGxjQMSVbM7ipBfj4E",
-  authDomain: "controlte-demo.firebaseapp.com",
-  projectId: "controlte-demo",
-  storageBucket: "controlte-demo.firebasestorage.app",
-  messagingSenderId: "540368855928",
-  appId: "1:540368855928:web:f4b12078397b3a09fb1e8d"
+  apiKey: "AIzaSyBTPG4Z8AqYA3oTprKfyt-_cXpT-CC-wio",
+  authDomain: "controlte-prod.firebaseapp.com",
+  projectId: "controlte-prod",
+  storageBucket: "controlte-prod.firebasestorage.app",
+  messagingSenderId: "1092890982693",
+  appId: "1:1092890982693:web:3e869bd9e0bb755cb0c2cc"
 };
-
 const fbApp = firebase.initializeApp(firebaseConfig);
 const auth  = firebase.auth();
 const db    = firebase.firestore();
 
 let fbUid    = null;   // se llena al autenticar, ver initAuthFirebase()
 let fbCodigo = null;   // codigo de licencia activo, una vez canjeado
+
+// v17.0: PLAN FREE — true si cuentas/{fbCodigo}.plan === 'free'. Se
+// determina una sola vez en initApp() (ver aplicarPlanFree()) y solo
+// controla qué se MUESTRA — la barrera real de qué se puede LEER está
+// en firestore-v5.rules, no aquí. Un free nunca tiene salario/nivel
+// reales cargados con intención, así que aunque abriera la consola no
+// hay con qué calcular nada verdadero.
+let esFree = false;
+
+// Aplica/quita la clase que oculta todo lo marcado .solo-pago, ajusta
+// el texto del status-badge (para no confundir "free" con el legado
+// "Gratis" = sin licencia), y dispara el modal si corresponde.
+function aplicarPlanFree(cuentaData) {
+  esFree = !!(cuentaData && cuentaData.plan === 'free');
+  document.body.classList.toggle('plan-free', esFree);
+  if (esFree) {
+    const txt = document.getElementById('status-txt');
+    const dot = document.getElementById('status-dot');
+    if (txt) txt.innerText = 'FREE';
+    if (dot) dot.className = 'status-dot active';
+    mostrarModalFreeSiCorresponde();
+  }
+}
+
+// Modal de límites/beneficios — una vez por día, no en cada apertura.
+function mostrarModalFreeSiCorresponde() {
+  const hoy = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  if (localStorage.getItem('cte_free_modal_fecha') === hoy) return;
+  const modal = document.getElementById('free-modal');
+  if (modal) modal.classList.add('show');
+}
+function cerrarModalFree() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  localStorage.setItem('cte_free_modal_fecha', hoy);
+  const modal = document.getElementById('free-modal');
+  if (modal) modal.classList.remove('show');
+}
 
 // Hash simple para no guardar el telefono en texto plano (no es criptografico,
 // solo evita que se lea a simple vista en la consola de Firebase).
@@ -1224,13 +1326,16 @@ async function validarCodigo() {
 
       expiraFinal = Date.now() + diasPlan * 24 * 60 * 60 * 1000;
 
+      // v15.0: si esta cuenta había sido marcada para reverificación
+      // forzada, se apaga aquí — ya se completó con éxito.
       await ref.update({
         uids: [fbUid],
         telHash:  hashSimple(tel),
         tel4Hash: hashSimple(tel.slice(-4)),
         ficha: ficha,
         nombre: nombreEscalafon,
-        expira: expiraFinal
+        expira: expiraFinal,
+        requiereVerificacion: false
       });
     } else {
       // Dispositivo nuevo: el campo tel4 del input se compara contra
@@ -1325,14 +1430,54 @@ async function initApp() {
   // "Otro" — no debe tumbar el arranque de la app.
   cargarCatalogoOrdenes().catch(() => {});
 
-  // Cliente con licencia local vieja (previa a esta versión), sin
-  // registro en Firestore: intenta registrarlo solo, sin pedirle nada.
-  if (!fbCodigo) {
+  // v15.0: REVERIFICACIÓN FORZADA. Cuando asegurarUidRegistrado() no logra
+  // enlazar un dispositivo (por reglas, por conexión, por lo que sea) y el
+  // caso queda atorado, el admin puede marcar la cuenta con
+  // requiereVerificacion:true en Firestore. La próxima vez que ese
+  // trabajador abra la app, se le borra la sesión local (código y
+  // licencia) y se le manda directo a la pantalla de código — donde,
+  // como uids sigue vacío, validarCodigo() lo trata como "primer canje":
+  // pide su ficha y confirma su nombre contra el escalafón antes de
+  // enlazar el uid. No requiere que el trabajador sepa qué pasó, solo que
+  // vuelva a escribir su código y su ficha.
+  let forzarReingreso = false;
+  if (fbCodigo) {
+    try {
+      const snapForzado = await db.collection('cuentas').doc(fbCodigo).get();
+      if (snapForzado.exists && snapForzado.data().requiereVerificacion === true) {
+        forzarReingreso = true;
+      }
+    } catch (e) {
+      // Sin conexión: no se fuerza nada, se sigue el flujo normal abajo.
+    }
+  }
+
+  if (forzarReingreso) {
+    localStorage.removeItem('cte_codigo');
+    localStorage.removeItem('cte_lic');
+    fbCodigo = null;
+  } else if (!fbCodigo) {
+    // Cliente con licencia local vieja (previa a esta versión), sin
+    // registro en Firestore: intenta registrarlo solo, sin pedirle nada.
     await intentarAutoRegistro();
   } else {
     // FIX v11.0: aunque ya haya código local guardado, confirma que este
     // dispositivo esté realmente enlazado en Firestore (ver asegurarUidRegistrado).
     await asegurarUidRegistrado(fbCodigo);
+  }
+
+  // v17.0: determina si esta cuenta es plan free ANTES de restaurar
+  // datos, para que la UI ya nazca restringida y no haya un parpadeo
+  // donde se ve la versión completa un instante.
+  if (fbCodigo) {
+    try {
+      const snapPlan = await db.collection('cuentas').doc(fbCodigo).get();
+      if (snapPlan.exists) aplicarPlanFree(snapPlan.data());
+    } catch (e) {
+      // Sin conexión: se reintenta en la próxima carga: no bloquea el
+      // arranque, y por defecto esFree queda false (no restringe de más
+      // a un pagado con mala señal).
+    }
   }
 
   // Siempre fusiona con la nube al arrancar, sin importar si ya habia
@@ -1508,14 +1653,19 @@ function mostrarPaywall() {
   selPlan('month');
 }
 
-// v13.1: arma el selector de orden de trabajo para un día con horas > 0.
-// Obligatorio visualmente (borde rojo) si no se ha elegido nada todavía.
-// "Otro" ya no abre campo de texto — solo marca "OTRO" para que se
-// corrija manualmente después, sin riesgo de que el trabajador teclee
-// mal un número de orden real.
-// v14.0: ahora filtra el catálogo por tipo (TE vs INSALUBRE) — cada
-// selector solo muestra las órdenes de su categoría. Las órdenes viejas
-// sin campo 'tipo' se tratan como TE (comportamiento antes de v7.0 admin).
+// v16.1: FIX — se regresa el selector real (dropdown), como pedido.
+// El auto-llenado de render() sigue poniendo la orden del día por
+// default cuando hay UNA sola coincidencia, pero el trabajador puede
+// verla y cambiarla si está mal — sirve como doble verificación: si el
+// admin se equivocó asignando la fecha, el trabajador lo nota porque la
+// orden no coincide con lo que hizo, y puede corregirla o avisar.
+function ordenesParaDia(fechaISO, categoria) {
+  return catalogoOrdenes.filter(o =>
+    Array.isArray(o.fechas) && o.fechas.includes(fechaISO) &&
+    (categoria === 'INSALUBRE' ? o.tipo === 'INSALUBRE' : o.tipo !== 'INSALUBRE')
+  );
+}
+
 function renderSelectorOrden(d, i, categoria) {
   const val = categoria === 'INSALUBRE' ? (d.ordenInsalubre || '') : (d.ordenTrabajo || '');
   const vacio = !val;
@@ -1529,7 +1679,7 @@ function renderSelectorOrden(d, i, categoria) {
   }).join('');
 
   const funcion = categoria === 'INSALUBRE' ? 'setOrdenInsalubre' : 'setOrden';
-  const placeholder = categoria === 'INSALUBRE' ? 'Orden de trabajo (insalubre)…' : 'Selecciona orden de trabajo…';
+  const placeholder = categoria === 'INSALUBRE' ? 'Orden de INSALUBRE — selecciona…' : 'Orden de TIEMPO EXTRA — selecciona…';
 
   const boton = vacio ? '' : `<button type="button" class="orden-borrar" title="Borrar selección" onclick="borrarOrden(${i}, '${categoria}')">×</button>`;
 
@@ -1550,6 +1700,25 @@ function renderSelectorOrden(d, i, categoria) {
 function render() {
   actualizarEstado();
   const sd = semData(semana);
+
+  // v16.2 FIX: el auto-llenado ahora solo aplica si el día realmente
+  // corresponde a esa categoría (TE: horas>0 capturadas; INSALUBRE: día
+  // normal) — antes se asignaba a CUALQUIER día que coincidiera en
+  // fecha, aunque el trabajador no hubiera hecho tiempo extra ese día.
+  // También respeta si el trabajador ya la había borrado a propósito
+  // (bandera *Rechazada) para que no reaparezca sola.
+  let huboAutoAsignacion = false;
+  sd.dias.forEach(d => {
+    if (!d.ordenTrabajo && !d.ordenTrabajoRechazada && d.horas > 0) {
+      const m = ordenesParaDia(d.fecha, 'TE');
+      if (m.length === 1) { d.ordenTrabajo = m[0].id; huboAutoAsignacion = true; }
+    }
+    if (!d.ordenInsalubre && !d.ordenInsalubreRechazada && d.tipo === 'normal') {
+      const m = ordenesParaDia(d.fecha, 'INSALUBRE');
+      if (m.length === 1) { d.ordenInsalubre = m[0].id; huboAutoAsignacion = true; }
+    }
+  });
+  if (huboAutoAsignacion) guardar();
 
   document.getElementById('wnum').textContent = `Semana ${semana}`;
   document.getElementById('wrng').textContent = `${fDate(sd.dias[0].fecha)} – ${fDate(sd.dias[6].fecha)}`;
@@ -1791,10 +1960,17 @@ function setOrdenInsalubre(i, valor) {
 
 // v14.1: borra la orden seleccionada (T.E. o insalubre) de un día, por si
 // el trabajador se equivocó de día o de tipo al capturar.
+// v16.2 FIX: ahora también marca una bandera de "rechazada" para que el
+// auto-llenado no la vuelva a poner sola en el siguiente render.
 function borrarOrden(i, categoria) {
   const d = semData(semana).dias[i];
-  if (categoria === 'INSALUBRE') d.ordenInsalubre = '';
-  else d.ordenTrabajo = '';
+  if (categoria === 'INSALUBRE') {
+    d.ordenInsalubre = '';
+    d.ordenInsalubreRechazada = true;
+  } else {
+    d.ordenTrabajo = '';
+    d.ordenTrabajoRechazada = true;
+  }
   guardar();
   render();
 }
@@ -1843,6 +2019,10 @@ function cambiarNivel() {
   render();
 }
 function showTab(id) {
+  // v17.0: defensa extra — aunque el botón esté oculto por CSS, si algo
+  // dispara showTab() con una pestaña de pago en una cuenta free, se
+  // redirige a captura en vez de mostrarla.
+  if (esFree && id !== 'captura' && id !== 'soporte') id = 'captura';
   document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-pane').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
