@@ -997,7 +997,15 @@ const FEST = new Set([
   '2026-11-16','2026-12-25'
 ]);
 
-const VERSION_ARCHIVO = 'Demo v28.0-fixAutoguardado';
+// v30.0-Fusión v27.2 y v29.0 — Versión fusionada:
+//   Base: index.html v29.0 (autoguardado tipo Excel, motor de cotejo por
+//         línea de PDF, UI de confirmación con casillas por semana).
+//   Integrado de v27.2: realineo en vivo de semanas no pagadas en semData()
+//         (fix retroactivo de aumentos), uso de guardarPosicion() en
+//         render()/cambiarSemana(), y uso de semData() en
+//         obtenerSemanasPendientesCot() para que el Cotejador vea los
+//         mismos montos realineados que Captura.
+const VERSION_ARCHIVO = 'Demo v30.0-Fusión v27.2 y v29.0';
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('footer-version');
   if (el) el.textContent = VERSION_ARCHIVO;
@@ -1141,6 +1149,14 @@ let nombreCache = localStorage.getItem('cte_nombre') || '';
 // cambiar de semana, al irse a segundo plano, o al cerrar la pestaña.
 // Formato: { i: índice del día 0-6, horas: número } o null si no hay nada.
 let draftHoras = null;
+// v28.1-autoguardadoTipoExcel: bandera de "hay cambios sin guardar", igual
+// que el asterisco de "modificado" de Excel. SOLO se activa cuando una
+// acción real del usuario modifica datos (guardarSemana). El guardado a
+// Firestore ya NO corre por temporizador ciego — corre cuando el debounce
+// de 2s se dispara tras una edición real, y el reintento periódico (ver
+// más abajo) solo actúa si esta bandera está encendida. Sin edición, cero
+// escrituras.
+let hayCambiosPendientes = false;
 
 // Hora extra ocasional (1130) = (sal + 60%sal + arc) ÷ 8 × 2  (Cláusula 193)
 const horaTE       = () => ((TAB[nivel] + TAB[nivel] * 0.60 + ARC[nivel]) / 8) * 2;
@@ -1214,14 +1230,7 @@ function semData(s) {
   return datos[k];
 }
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCVvu-yF6a67nKPyVGxjQMSVbM7ipBfj4E",
-  authDomain: "controlte-demo.firebaseapp.com",
-  projectId: "controlte-demo",
-  storageBucket: "controlte-demo.firebasestorage.app",
-  messagingSenderId: "540368855928",
-  appId: "1:540368855928:web:f4b12078397b3a09fb1e8d"
-};
+//credenciales
 
 
 const fbApp = firebase.initializeApp(firebaseConfig);
@@ -1344,6 +1353,7 @@ function guardar() {
   guardarSemana(semana);
 }
 function guardarSemana(s) {
+  hayCambiosPendientes = true;   // ← v28.1: hubo una edición real, marcar como "modificado"
   try { congelarMontos(s); } catch (eCalc) { console.error('guardarSemana(): congelarMontos falló', eCalc); }
   try {
     localStorage.setItem('cte_v4',      JSON.stringify(datos));
@@ -1493,6 +1503,7 @@ async function guardarSemanaFirestore(sNum) {
     await db.collection('cuentas').doc(fbCodigo)
              .collection('semanas').doc('s' + s)
              .set({ ...sd, ultimaModificacion: firebase.firestore.FieldValue.serverTimestamp() });
+    hayCambiosPendientes = false;   // ← v28.1: ya se subió, apagar bandera
     // Última actividad + perfil (nivel/jornada): escritura aparte y NO
     // bloqueante — si falla, no debe tumbar el guardado real de la
     // semana, que es lo crítico. El admin usa 'ultimoAcceso' solo como
@@ -1525,19 +1536,26 @@ async function guardarSemanaFirestore(sNum) {
     setSyncStatus('error');
   }
 }
-
-// AUTOGUARDADO PERIÓDICO — igual que el autoguardado de Excel: sin importar
-// si el guardado disparado por edición falló (mala señal, sesión que aún
-// no cargó, etc.), este intervalo reintenta solo cada 5s mientras la
-// pestaña esté abierta. guardarSemanaFirestore() ya es segura de repetir
-// (usa .set(), no crea duplicados), así que no hay riesgo en llamarla
-// de mas — si ya estaba guardado, simplemente vuelve a escribir lo mismo.
-// FIX v12.3.3: bajado de 15s a 5s — algunos trabajadores abren la app,
-// la ven un momento y la cierran antes de los 15s, sin dejar tiempo a
-// que se dispare ni el guardado ni el registro de error si algo falla.
+// v28.1-autoguardadoTipoExcel — REEMPLAZA el setInterval ciego de 5s que
+// escribía a Firestore SIEMPRE, aunque no hubiera cambiado nada. Eso era
+// la causa real de las ~81k escrituras/mes con solo 5 usuarios: 12
+// escrituras por minuto por pestaña abierta, sin importar si el
+// trabajador tocó algo o no.
+//
+// Ahora funciona como el autoguardado de Excel: solo reintenta si hay
+// una edición real sin confirmar (hayCambiosPendientes === true). El
+// flujo normal es:
+//   1. Usuario edita algo → guardarSemana() enciende la bandera y
+//      programa el debounce de 2s (guardarSemanaFirestoreDebounced).
+//   2. A los 2s de inactividad, se sube a Firestore y la bandera se apaga.
+//   3. Si esa subida falla (mala señal), la bandera queda encendida y
+//      este intervalo la reintenta cada 30s.
+//   4. En cuanto sube bien, la bandera se apaga y este intervalo deja
+//      de disparar escrituras hasta la próxima edición real.
+// Resultado: sin edición, CERO escrituras.
 setInterval(() => {
-  if (fbCodigo && fbUid) guardarSemanaFirestore();
-}, 5000);
+  if (hayCambiosPendientes && fbCodigo && fbUid) guardarSemanaFirestore();
+}, 30000);
 
 setInterval(() => {
   consolidarDraftHoras();
@@ -4184,6 +4202,8 @@ window.confirmarLiquidacionCotejo = async function() {
     console.error('confirmarLiquidacionCotejo(): localStorage falló', eStorage);
   }
 
+  hayCambiosPendientes = true;   // ← v28.1: el Cotejador también edita datos (marca pagado), activar bandera
+
   if (fbCodigo && fbUid) {
     const fallidas = [];
     for (const key of claves) {
@@ -4207,6 +4227,7 @@ window.confirmarLiquidacionCotejo = async function() {
         .catch(() => {});
       status.textContent = `⚠️ Guardado en este dispositivo. ${fallidas.length} semana(s) no se pudieron subir a la nube todavía — se reintentarán solas la próxima vez que abras la app con conexión.`;
     } else {
+      hayCambiosPendientes = false;   // ← v28.1: todas subieron bien, apagar bandera
       status.textContent = `✅ ${claves.length} semana(s) marcadas como pagadas y sincronizadas.`;
     }
   } else {
