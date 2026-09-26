@@ -1221,7 +1221,15 @@ function semData(s) {
   // AÚN sin marcar "pagado", márcalas como pagadas ANTES de cambiar el
   // nivel en el selector — o avísame para agregar un candado de fecha por
   // nivel en vez de este realineo simple.
-  if (datos[k].pagado !== true) {
+  // FIX v30.1 — realineo SOLO en semanas vacías.
+  // Una semana que YA tiene horas capturadas queda congelada con el
+  // nivel/salario del momento en que se capturó la primera hora —
+  // sin importar si está pagada o no. Esto preserva el comportamiento
+  // histórico: lo capturado no se recalcula solo.
+  // El realineo aplica únicamente a semanas VACÍAS (0 horas) — para
+  // que un aumento retroactivo sí se refleje en semanas aún no trabajadas.
+  const tieneHoras = datos[k].dias && datos[k].dias.some(d => (d.horas || 0) > 0);
+  if (datos[k].pagado !== true && !tieneHoras) {
     datos[k].nivelSnap = nivel;
     const iniLiveISO = semInicio(s).toISOString().slice(0,10);
     datos[k].salSnap  = TABv(datos[k].nivelSnap, iniLiveISO);
