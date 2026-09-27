@@ -3440,14 +3440,22 @@ function cotejarPorLineasPDF(lineasObjetivo, pendientesTodas, toleranciaAmplia) 
   // elegir la de MENOR diferencia máxima en monto (igual que 'cercana' más
   // arriba) — la fecha filtra el universo razonable, el monto decide cuál
   // es la mejor candidata dentro de ese universo, nunca al revés.
-  const MAX_DIAS_CANDIDATO_POR_FECHA = 60;
+  // v26.1 — candidato por eliminación acotado: la ref del recibo NO puede
+  // caer antes del inicio de la semana candidata (sería una semana posterior
+  // al recibo, imposible). Solo se acepta rezago de RH hasta 42 días.
+  const DIAS_REZAGO_MAX = 42;
   lineas.forEach(l => {
     if (!l.sinCoincidencia) return;
     let mejor = null;
     pendientesTodas.forEach(s => {
       if (usadasSemanas.has(s.key)) return;
-      const dist = diasEntreCot(s.fechaTieBreak || s.fin, l.ref);
-      if (dist > MAX_DIAS_CANDIDATO_POR_FECHA) return;
+      const ref = new Date(l.ref + 'T12:00');
+      const ini = new Date(s.ini + 'T12:00');
+      const fin = new Date(s.fin + 'T12:00');
+      if (ref < ini) return;                              // semana posterior al recibo → fuera
+      const diasDeRezago = (ref - fin) / 86400000;
+      if (diasDeRezago > DIAS_REZAGO_MAX) return;         // rezago excesivo → fuera
+      const dist = diasDeRezago > 0 ? diasDeRezago : 0;
       const maxAbs = Math.max(...l.claves.map(c => Math.abs(s[CAMPO_COT_POR_CLAVE[c]] - l.perfil[c])));
       if (!mejor || maxAbs < mejor.maxAbs) mejor = { semana: s, dist, maxAbs };
     });
